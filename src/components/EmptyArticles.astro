@@ -1,0 +1,11 @@
+---
+import { localHref } from "../lib/site";
+import Arrow from "./Arrow.astro";
+---
+<div class="empty-note paper" data-empty-articles>
+  <span class="tape" aria-hidden="true"></span>
+  <span class="eyebrow">A LITTLE SPACE FOR NOTES</span>
+  <h2>ここには、これから。</h2>
+  <p>読みものは、まだありません。<br />ひとまず、ツールからどうぞ。</p>
+  <a class="text-link" href={`${localHref()}#tools`}>TOOLBOXへ<Arrow /></a>
+</div>

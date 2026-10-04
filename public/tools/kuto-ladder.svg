@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1254 1254" role="img" aria-labelledby="title desc">
+  <title id="title">Kuto Ladder</title>
+  <desc id="desc">Perspective ladder icon with four cyan-blue trapezoid rungs and dark navy tapered side rails on black.</desc>
+
+  <defs>
+    <!-- The source rails are almost flat navy; the tiny variation keeps the same depth without changing the silhouette. -->
+    <linearGradient id="rail" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#021b40"/>
+      <stop offset="0.55" stop-color="#021d43"/>
+      <stop offset="1" stop-color="#011a40"/>
+    </linearGradient>
+
+    <!-- Each rung gets progressively bluer toward the viewer, matching the source image. -->
+    <linearGradient id="rung1" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#00f3fc"/>
+      <stop offset="0.52" stop-color="#00f3fe"/>
+      <stop offset="1" stop-color="#00e7fc"/>
+    </linearGradient>
+    <linearGradient id="rung2" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#00f5fe"/>
+      <stop offset="0.52" stop-color="#00e3fd"/>
+      <stop offset="1" stop-color="#00c8fe"/>
+    </linearGradient>
+    <linearGradient id="rung3" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#01d1fe"/>
+      <stop offset="0.52" stop-color="#00b8fd"/>
+      <stop offset="1" stop-color="#0099fe"/>
+    </linearGradient>
+    <linearGradient id="rung4" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#00b7fd"/>
+      <stop offset="0.52" stop-color="#009dfd"/>
+      <stop offset="1" stop-color="#0079fd"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Four perspective rungs, centered on x=650 to match the source placement. -->
+  <g transform="translate(23 0)">
+  <path fill="url(#rung1)" d="M478 357 H776 L800 459 H454 Z"/>
+  <path fill="url(#rung2)" d="M444 515 H810 L835 627 H419 Z"/>
+  <path fill="url(#rung3)" d="M406 684 H848 L877 803 H377 Z"/>
+  <path fill="url(#rung4)" d="M365 864 H889 L919 984 H335 Z"/>
+
+  <!-- Left rail: a tapered surface, not a constant-width stroke. -->
+  <path fill="url(#rail)" d="
+    M373 310
+    H447
+    C458 310 466 318 463 332
+    L291 1019
+    C287 1034 276 1043 261 1043
+    H143
+    C126 1043 113 1030 119 1010
+    L328 346
+    C334 325 351 310 373 310
+    Z"/>
+
+  <!-- Right rail is the exact mirror of the left rail around the source perspective axis. -->
+  <path fill="url(#rail)" d="
+    M881 310
+    H807
+    C796 310 788 318 791 332
+    L963 1019
+    C967 1034 978 1043 993 1043
+    H1111
+    C1128 1043 1141 1030 1135 1010
+    L926 346
+    C920 325 903 310 881 310
+    Z"/>
+  </g>
+</svg>

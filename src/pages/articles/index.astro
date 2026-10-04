@@ -1,0 +1,14 @@
+---
+import ArticleFilter from "../../components/ArticleFilter.astro";
+import ArticleList from "../../components/ArticleList.astro";
+import EmptyArticles from "../../components/EmptyArticles.astro";
+import SiteLayout from "../../layouts/SiteLayout.astro";
+import { getPublishedPosts } from "../../lib/posts";
+import { siteName } from "../../lib/site";
+
+const posts = await getPublishedPosts();
+---
+<SiteLayout title="読みもの" description={`${siteName} の読みもの一覧。`}>
+  <header class="page-heading"><div class="heading-note paper"><span class="tape" aria-hidden="true"></span><p class="eyebrow">THE NOTEBOOK</p><h1>読みもの</h1><p>書きとめたことを、ひとつずつ。</p></div></header>
+  {posts.length > 0 ? <ArticleFilter posts={posts}><ArticleList posts={posts} /></ArticleFilter> : <EmptyArticles />}
+</SiteLayout>

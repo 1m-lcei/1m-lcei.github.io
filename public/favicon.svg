@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+  <title>Kei's Pinboard</title>
+  <rect x="5" y="5" width="38" height="38" rx="10" fill="#35594c"/>
+  <rect x="12" y="15" width="24" height="22" rx="2" fill="#fff8e9"/>
+  <path d="M18 25h12m-12 5h8" stroke="#9aaf9e" stroke-width="2" stroke-linecap="round"/>
+  <path d="M24 12v10" stroke="#563c29" stroke-width="2"/>
+  <circle cx="24" cy="13" r="5" fill="#dd9258"/>
+  <circle cx="23" cy="12" r="1.5" fill="#f5bd8e"/>
+</svg>

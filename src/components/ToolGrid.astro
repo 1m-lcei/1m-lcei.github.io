@@ -1,0 +1,19 @@
+---
+import type { Tool } from "../data/tools";
+import filterScript from "../scripts/tool-filter.js?raw";
+import ToolCard from "./ToolCard.astro";
+
+interface Props { tools: Tool[] }
+const { tools } = Astro.props;
+---
+<div data-tool-filter>
+  <p class="visually-hidden" role="status" aria-live="polite" data-tool-announcement></p>
+  <div class="tool-filter-status paper" data-tool-filter-status hidden>
+    <span data-tool-filter-label></span>
+    <button type="button" class="tool-filter-clear" aria-label="ツールの絞り込みを解除" data-clear-tool-filter>解除</button>
+  </div>
+  <ul id="tool-list" class="tool-grid" role="list">
+    {tools.map((tool) => <ToolCard tool={tool} />)}
+  </ul>
+</div>
+<script is:inline data-tool-filter-script set:html={filterScript}></script>

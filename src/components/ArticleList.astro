@@ -1,0 +1,26 @@
+---
+import type { CollectionEntry } from "astro:content";
+import { articleHref, formatDate } from "../lib/site";
+import ArticleTags from "./ArticleTags.astro";
+import Arrow from "./Arrow.astro";
+
+interface Props {
+  posts: CollectionEntry<"posts">[];
+}
+const { posts } = Astro.props;
+---
+<ul class="article-list" role="list" data-article-list>
+  {posts.map((post) => (
+    <li data-article-tags={JSON.stringify(post.data.tags)}>
+      <a class="article-card paper" href={articleHref(post.id)} aria-labelledby={`post-${post.id}`}>
+        <span class="article-date"><time datetime={post.data.date.toISOString().slice(0, 10)}>{formatDate(post.data.date)}</time></span>
+        <div class="article-summary">
+          <h2 id={`post-${post.id}`}>{post.data.title}</h2>
+          <p>{post.data.description}</p>
+          <ArticleTags tags={post.data.tags} />
+        </div>
+        <Arrow />
+      </a>
+    </li>
+  ))}
+</ul>

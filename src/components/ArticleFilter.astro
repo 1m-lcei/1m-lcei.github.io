@@ -1,0 +1,26 @@
+---
+import type { CollectionEntry } from "astro:content";
+import filterScript from "../scripts/article-filter.js?raw";
+interface Props { posts: CollectionEntry<"posts">[]; limit?: number }
+const { posts, limit } = Astro.props;
+const tags = [...new Set(posts.flatMap((post) => post.data.tags))].sort((a, b) => a.localeCompare(b, "ja"));
+---
+<div class="article-filter" data-article-filter data-limit={limit}>
+  {tags.length > 0 && <>
+    <div class="article-filters" role="group" aria-label="読みものをタグで絞り込む" data-article-filters hidden>
+      <span class="filter-label paper">タグでめくる</span>
+      <div class="filter-options">
+        <button type="button" class="index-tab" data-article-tag="" aria-pressed="true">すべて</button>
+        {tags.map((tag) => <button type="button" class="index-tab" data-article-tag={tag} aria-pressed="false">{tag}</button>)}
+      </div>
+    </div>
+    <p class="filter-status paper" role="status" aria-live="polite" data-filter-status hidden></p>
+  </>}
+  <slot />
+  {tags.length > 0 && <div class="filter-empty paper" data-filter-empty hidden>
+    <span class="tape" aria-hidden="true"></span>
+    <p>このタグの読みものは、まだありません。</p>
+    <button type="button" class="index-tab" data-clear-filter>すべての読みものに戻す</button>
+  </div>}
+</div>
+{tags.length > 0 && <script is:inline data-article-filter-script set:html={filterScript}></script>}

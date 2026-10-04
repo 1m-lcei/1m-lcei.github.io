@@ -1,0 +1,14 @@
+---
+import Arrow from "../components/Arrow.astro";
+import SiteLayout from "../layouts/SiteLayout.astro";
+import { localHref } from "../lib/site";
+---
+<SiteLayout title="ページが見つかりません" description="ページが移動したか、URLが違っているようです。入口のボードから、もう一度どうぞ。" noindex>
+  <section class="not-found paper">
+    <span class="tape" aria-hidden="true"></span>
+    <p class="eyebrow">404 · NOT ON THIS BOARD</p>
+    <h1>このピンは、<br />見つかりませんでした。</h1>
+    <p>ページが移動したか、URLが違っているようです。<br />入口のボードから、もう一度どうぞ。</p>
+    <a class="text-link" href={localHref()}>ボードへ戻る<Arrow /></a>
+  </section>
+</SiteLayout>
