@@ -870,6 +870,11 @@ try {
       ).find((node) => !node.closest("[data-work-item]").hidden);
       const item = card.closest("[data-work-item]");
       const pin = item.querySelector(".work-pin");
+      // Observe the whole short cycle even when CI delays the browser round-trip.
+      const sway = card
+        .getAnimations()
+        .find((animation) => animation.animationName === "work-card-sway");
+      sway.currentTime = 0;
       const samples = [];
       const started = performance.now();
       for (;;) {
