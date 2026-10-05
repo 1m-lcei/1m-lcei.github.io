@@ -1,6 +1,6 @@
 # Kei's Pinboard
 
-4つのWebツールとMarkdown記事の静的ポータル。Astro・TypeScript・素のCSS・Bunを使用する。表札は `@1m_lcei`、プロジェクト名とbaseは `kei-pinboard`。予定公開URLは `https://1m-lcei.github.io/kei-pinboard/`。
+4つのWebツールと2つの外部記事を同じカード一覧に置く静的ポータル。Markdown記事の基盤も保持する。Astro・TypeScript・素のCSS・Bunを使用する。表札は `@1m_lcei`、プロジェクト名とbaseは `kei-pinboard`。予定公開URLは `https://1m-lcei.github.io/kei-pinboard/`。
 
 ## 開発・検証
 
@@ -22,16 +22,18 @@ TypeScriptは6.0.3を保持する。正式な `typescript` 7.0.2は存在する�
 
 | 場所 | 用途 |
 | --- | --- |
-| `src/data/tools.ts` | ツールの名前・文面・リンク・タグ・画像の表示範囲 |
+| `src/data/works.ts` | 成果物の名前・文面・公開日時と出典・リンク・タグ・画像の表示範囲 |
 | `src/styles/global.css` | 配色・フォント・レイアウト |
 | `src/layouts/SiteLayout.astro` | 共通表示とHTMLメタデータ |
 | `src/lib/site.ts` / `astro.config.mjs` | サイト名・説明・公開先・base |
 | `src/content/posts/` / `templates/article.md` | 記事とひな形 |
-| `public/tools/` / `public/tools/screenshots/` | ツールアイコン・PNG/AVIF |
+| `public/tools/` / `public/tools/screenshots/` | ツールアイコン・PNG/AVIF（外部記事は `public/articles/`） |
 | `src/assets/textures/` / `assets/` | 紙・コルクの素材と出典 |
 | `scripts/` | ブラウザ検証と隔離プレビュー |
 
-記事の必須項目は `title`、`description`、`date`。公開するものだけ `draft: false` にし、`tags` は任意。下書きと仮記事は本番に含めない。記事は `/kei-pinboard/articles/` に並び、トップはツールだけを表示する。既存4ツールのリポジトリは変更しない。
+成果物は確認済みの公開日時の新しい順で初期表示し、一覧上のテープ留め紙札で古い順と切り替えられる。同時刻は定義順、不明日時は `null` として末尾を保つ。タグで絞り込んだ状態でも順を切り替えられ、解除後も選んだ順序を保つ。DOM順も表示と一致し、キーボードや読み上げはその順に従う。並び順は永続保存しない。根拠・精度と確認待ちは [公開日時の記録](assets/publication-sources.md) を参照。
+
+記事の必須項目は `title`、`description`、`date`。公開するものだけ `draft: false` にし、`tags` は任意。下書きと仮記事は本番に含めない。記事は `/kei-pinboard/articles/` に並び、トップはツールと外部記事を同じ一覧に表示する。既存4ツールのリポジトリは変更しない。
 
 メタデータはページ別title/description・canonical・OGP・画像なしのX summary。記事は `article` と公開日、404と仮記事プレビューは `noindex` とし、公開URLのcanonicalを付けない。OGP画像は用意しない。
 

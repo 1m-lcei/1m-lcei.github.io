@@ -1,11 +1,11 @@
 ---
-import ToolGrid from "../components/ToolGrid.astro";
-import { tools } from "../data/tools";
+import WorkGrid from "../components/WorkGrid.astro";
+import { works } from "../data/works";
 import SiteLayout from "../layouts/SiteLayout.astro";
 ---
 <SiteLayout>
-  <section id="tools" class="board-section toolbox-section">
-    <h1 class="visually-hidden">ツール一覧</h1>
-    <ToolGrid tools={tools} />
+  <section id="works" class="board-section works-section">
+    <h1 class="visually-hidden">成果物一覧</h1>
+    <WorkGrid works={works} />
   </section>
 </SiteLayout>

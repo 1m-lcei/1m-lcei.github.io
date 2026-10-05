@@ -1,0 +1,57 @@
+---
+import type { Work } from "../data/works";
+import { localHref } from "../lib/site";
+import Arrow from "./Arrow.astro";
+
+interface Props {
+  work: Work;
+}
+const { work } = Astro.props;
+const { preview } = work;
+const publicationDateParts = work.tags.includes("記事") && work.publishedAt !== null
+  ? Object.fromEntries(new Intl.DateTimeFormat("ja-JP", {
+      timeZone: "Asia/Tokyo",
+      year: "numeric",
+      month: "numeric",
+      day: "numeric",
+    }).formatToParts(new Date(work.publishedAt)).map(({ type, value }) => [type, value]))
+  : null;
+const publicationDate = publicationDateParts
+  ? `${publicationDateParts.year}年${publicationDateParts.month}月${publicationDateParts.day}日`
+  : null;
+const previewStyle = [
+  `--preview-fit-width: ${Math.min(100, (preview.crop.width / preview.crop.height / 2) * 100)}%`,
+  `--preview-ratio: ${preview.crop.width} / ${preview.crop.height}`,
+  `--preview-width: ${(preview.width / preview.crop.width) * 100}%`,
+  `--preview-left: ${(-preview.crop.x / preview.crop.width) * 100}%`,
+  `--preview-top: ${(-preview.crop.y / preview.crop.height) * 100}%`,
+].join(";");
+---
+<li data-work-item data-work-tags={JSON.stringify(work.tags)} data-work-published-at={work.publishedAt}>
+  <article class:list={["work-card", "paper", `tone-${work.tone}`]} data-work-card={work.id}>
+    <span class="pin" aria-hidden="true"></span>
+    <div class="work-heading">
+      <span class="work-icon">{work.icon.includes("#")
+        ? <svg width="40" height="40" aria-hidden="true"><use href={localHref(work.icon)} /></svg>
+        : <img src={localHref(work.icon)} width="48" height="48" alt="" />}</span>
+      <h2 id={`title-${work.id}`}><a class="work-link" href={work.href}
+        aria-labelledby={`title-${work.id}`} aria-describedby={`description-${work.id}`} data-work={work.id}>{work.name}</a></h2>
+    </div>
+    <div class="work-tags" role="group" aria-label={`${work.name} の分類タグ`}>
+      {work.tags.map((tag) => <button type="button" class="work-tag" data-work-tag={tag}
+        aria-pressed="false" aria-controls="work-list" disabled><span class="tag">{tag}</span></button>)}
+    </div>
+    <figure class="work-preview" data-work-preview-frame={work.id}>
+      <picture class="work-preview-crop" style={previewStyle} data-work-preview={work.id}>
+        <source type="image/avif" srcset={localHref(preview.avif)} />
+        <img src={localHref(preview.png)} width={preview.width} height={preview.height}
+          alt={preview.alt} loading="lazy" decoding="async" />
+      </picture>
+    </figure>
+    <p class="work-description" id={`description-${work.id}`}>{work.description}</p>
+    <div class="card-bottom">
+      {publicationDate && <p class="work-publication">公開：<time datetime={work.publishedAt}>{publicationDate}</time></p>}
+      <Arrow />
+    </div>
+  </article>
+</li>

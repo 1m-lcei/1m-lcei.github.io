@@ -5,7 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import AxeBuilder from "@axe-core/playwright";
 import { chromium, firefox } from "playwright";
-import { tools } from "../src/data/tools.ts";
+import { sortWorksByPublishedAt, works } from "../src/data/works.ts";
 import { brandName, siteDescription, siteName } from "../src/lib/site.ts";
 import { createPreviewFixture } from "./preview-content.mjs";
 
@@ -22,13 +22,108 @@ const channel =
 const qaRoot = path.join(root, ".cache", "qa");
 const qa = path.join(qaRoot, channel);
 const base = "/kei-pinboard/";
-const expectedTools = [
+const expectedWorks = [
   "kuto-measure",
   "image-rect-picker",
-  "kuto-ladder",
   "kuto-nanidasu",
+  "kuto-ladder",
+  "blue-archive-damage",
+  "kuto-glossary",
 ];
+const expectedPublishedAt = {
+  "kuto-measure": "2026-09-26T11:06:47Z",
+  "image-rect-picker": "2026-09-23T15:05:57Z",
+  "kuto-nanidasu": "2025-10-10T10:39:51Z",
+  "kuto-ladder": "2025-10-02T11:26:07Z",
+  "blue-archive-damage": "2025-05-11T19:14:04.139+09:00",
+  "kuto-glossary": "2024-11-09T09:33:49Z",
+};
+const expectedWorkTags = {
+  "kuto-measure": ["ツール", "ブルーアーカイブ", "戦術対抗戦"],
+  "image-rect-picker": ["ツール", "画像"],
+  "kuto-nanidasu": ["診断", "ブルーアーカイブ", "戦術対抗戦"],
+  "kuto-ladder": ["ツール", "ブルーアーカイブ", "戦術対抗戦"],
+  "blue-archive-damage": ["記事", "ブルーアーカイブ", "ダメージ計算"],
+  "kuto-glossary": ["記事", "ブルーアーカイブ", "戦術対抗戦"],
+};
+const expectedDestinations = {
+  "kuto-measure": "https://1m-lcei.github.io/kuto-measure/",
+  "image-rect-picker": "https://1m-lcei.github.io/image-rect-picker/",
+  "kuto-ladder": "https://1m-lcei.github.io/kuto-ladder/",
+  "kuto-nanidasu": "https://1m-lcei.github.io/kuto-nanidasu/",
+  "blue-archive-damage": "https://zenn.dev/1m_lcei/books/b380b976c908d9",
+  "kuto-glossary":
+    "https://gist.github.com/1m-lcei/651ba5bca28fe41011424302b476c770",
+};
+const expectedTagMatches = {
+  ツール: ["kuto-measure", "image-rect-picker", "kuto-ladder"],
+  診断: ["kuto-nanidasu"],
+  画像: ["image-rect-picker"],
+  戦術対抗戦: ["kuto-measure", "kuto-nanidasu", "kuto-ladder", "kuto-glossary"],
+  ブルーアーカイブ: [
+    "kuto-measure",
+    "kuto-nanidasu",
+    "kuto-ladder",
+    "blue-archive-damage",
+    "kuto-glossary",
+  ],
+  記事: ["blue-archive-damage", "kuto-glossary"],
+  ダメージ計算: ["blue-archive-damage"],
+};
 const checks = [];
+for (const work of works) {
+  assert(Object.hasOwn(work, "publishedAt"));
+  assert.equal(work.publishedAt, expectedPublishedAt[work.id]);
+  assert.deepEqual(work.tags, expectedWorkTags[work.id]);
+  if (work.publishedAt === null) {
+    assert.equal(work.publicationSource, null);
+  } else {
+    assert.match(
+      work.publishedAt,
+      /^\d{4}-\d{2}-\d{2}T.+(?:Z|[+-]\d{2}:\d{2})$/,
+    );
+    assert(new URL(work.publicationSource.url).protocol === "https:");
+    assert(
+      ["second", "millisecond"].includes(work.publicationSource.precision),
+    );
+  }
+}
+assert.deepEqual(
+  sortWorksByPublishedAt(works).map((work) => work.id),
+  expectedWorks,
+);
+const stableFixture = Object.freeze([
+  { id: "unknown-first", publishedAt: null },
+  { id: "equal-jst-first", publishedAt: "2025-05-11T09:00:00+09:00" },
+  { id: "same-day-newer", publishedAt: "2025-05-11T12:00:00Z" },
+  { id: "equal-utc-second", publishedAt: "2025-05-11T00:00:00Z" },
+  { id: "older", publishedAt: "2024-11-09T09:33:49Z" },
+  { id: "unknown-second", publishedAt: null },
+]);
+const stableBefore = structuredClone(stableFixture);
+assert.deepEqual(
+  sortWorksByPublishedAt(stableFixture).map((work) => work.id),
+  [
+    "same-day-newer",
+    "equal-jst-first",
+    "equal-utc-second",
+    "older",
+    "unknown-first",
+    "unknown-second",
+  ],
+);
+assert.deepEqual(
+  stableFixture,
+  stableBefore,
+  "Sorting must not mutate the input",
+);
+assert.throws(
+  () => sortWorksByPublishedAt([{ publishedAt: "invalid" }]),
+  TypeError,
+);
+checks.push(
+  "Publication timestamps and sources are explicit; newer instants sort first, equal instants across time zones and unknown dates keep their input order",
+);
 await mkdir(qa, { recursive: true });
 const browserTemp = path.join(qa, "browser-temp");
 await mkdir(browserTemp, { recursive: true });
@@ -290,7 +385,9 @@ try {
   }
 
   async function loadPreviewImages(target = page) {
-    for (const img of await target.locator('img[loading="lazy"]').all()) {
+    for (const img of await target
+      .locator('img[loading="lazy"]:visible')
+      .all()) {
       await img.scrollIntoViewIfNeeded();
       await img.evaluate((node) => node.decode());
     }
@@ -376,11 +473,29 @@ try {
   checks.push(
     "Cork and paper textures load as local WebP assets under the Pages base",
   );
-  assert.equal(await page.locator("a[data-tool]").count(), 4);
-  for (const id of expectedTools) {
+  assert.equal(await page.locator("a[data-work]").count(), 6);
+  assert.deepEqual(
+    await page
+      .locator("a[data-work]")
+      .evaluateAll((nodes) => nodes.map((node) => node.dataset.work)),
+    expectedWorks,
+  );
+  for (const [id, publishedAt] of Object.entries(expectedPublishedAt)) {
     assert.equal(
-      await page.locator(`[data-tool='${id}']`).getAttribute("href"),
-      `https://1m-lcei.github.io/${id}/`,
+      await page
+        .locator(`[data-work-card="${id}"]`)
+        .locator("..")
+        .getAttribute("data-work-published-at"),
+      publishedAt,
+    );
+  }
+  checks.push(
+    "Built HTML renders all six works in verified publication order with the oldest Gist last",
+  );
+  for (const id of expectedWorks) {
+    assert.equal(
+      await page.locator(`[data-work='${id}']`).getAttribute("href"),
+      expectedDestinations[id],
     );
   }
   assert.equal(await page.locator("[data-article-list] a").count(), 0);
@@ -391,7 +506,7 @@ try {
       .count(),
     0,
   );
-  assert.equal(await page.locator("main h1").textContent(), "ツール一覧");
+  assert.equal(await page.locator("main h1").textContent(), "成果物一覧");
   assert.equal(await page.locator(".brand-wordmark").textContent(), "@1m_lcei");
   assert.equal(await page.title(), "Kei's Pinboard");
   assert.equal(
@@ -412,31 +527,31 @@ try {
   );
   assert.equal(await page.locator("a button").count(), 0);
   assert(!(await page.locator("body").innerText()).includes("ツールをひらく"));
-  for (const tool of tools) {
-    const card = page.locator(`[data-tool-card="${tool.id}"]`);
+  for (const work of works) {
+    const card = page.locator(`[data-work-card="${work.id}"]`);
     assert.equal(
-      await card.getByRole("link", { name: tool.name, exact: true }).count(),
+      await card.getByRole("link", { name: work.name, exact: true }).count(),
       1,
     );
     assert.deepEqual(
-      await card.locator("[data-tool-tag]").allTextContents(),
-      tool.tags,
+      await card.locator("[data-work-tag]").allTextContents(),
+      expectedWorkTags[work.id],
     );
     assert.equal(await card.locator(".card-bottom svg").count(), 1);
     assert(
-      (await card.locator(".tool-tags").boundingBox()).y >=
-        (await card.locator(".tool-heading").boundingBox()).y +
-          (await card.locator(".tool-heading").boundingBox()).height -
+      (await card.locator(".work-tags").boundingBox()).y >=
+        (await card.locator(".work-heading").boundingBox()).y +
+          (await card.locator(".work-heading").boundingBox()).height -
           1,
     );
   }
   assert.equal(
     await page.locator("script").count(),
     1,
-    "The homepage ships only the lightweight tool tag filter",
+    "The homepage ships only the lightweight work tag filter",
   );
   assert.equal(
-    await page.locator("script[data-tool-filter-script]").count(),
+    await page.locator("script[data-work-filter-script]").count(),
     1,
   );
   assert.equal(
@@ -455,9 +570,141 @@ try {
     "Tape should have no highlight gradients",
   );
   await localLinksAndAssets();
+  const brandSpriteResponse = await context.request.get(
+    new URL(`${base}article-icons.svg`, page.url()).href,
+  );
+  assert.equal(brandSpriteResponse.status(), 200);
+  assert.match(
+    brandSpriteResponse.headers()["content-type"],
+    /image\/svg\+xml/,
+  );
+  const brandSprite = await brandSpriteResponse.text();
+  const zennSource = await readFile(
+    path.join(root, "assets/brand-sources/zenn.svg.txt"),
+    "utf8",
+  );
+  const gistSource = await readFile(
+    path.join(root, "assets/brand-sources/gist.svg.txt"),
+    "utf8",
+  );
+  const normalizeMarkup = (value) =>
+    value.replace(/\s+/g, " ").replace(/>\s+</g, "><").trim();
+  assert(
+    normalizeMarkup(brandSprite).includes(
+      normalizeMarkup(zennSource.match(/<g fill="#3EA8FF">[\s\S]*?<\/g>/)[0]),
+    ),
+  );
+  assert(
+    normalizeMarkup(brandSprite).includes(
+      normalizeMarkup(gistSource.match(/<path[\s\S]*?\/>/)[0]),
+    ),
+  );
+  for (const [id, symbol] of [
+    ["blue-archive-damage", "zenn"],
+    ["kuto-glossary", "gist"],
+  ]) {
+    const icon = page.locator(`[data-work-card="${id}"] .work-icon svg`);
+    assert.equal(await icon.count(), 1);
+    assert.equal(await icon.getAttribute("aria-hidden"), "true");
+    const use = icon.locator("use");
+    assert.equal(
+      await use.getAttribute("href"),
+      `${base}article-icons.svg#${symbol}`,
+    );
+    const bounds = await use.evaluate((node) => {
+      const box = node.getBBox();
+      return { width: box.width, height: box.height };
+    });
+    assert(
+      bounds.width > 0 && bounds.height > 0,
+      "Official service symbol must render",
+    );
+  }
+  checks.push(
+    "Article icons use local SVG symbols with the unchanged blue Zenn logo and black Octicons code paths",
+  );
+  const frameMetrics = [];
+  async function verifyImageFrames(label, target = page) {
+    const metrics = await target
+      .locator("[data-work-preview-frame]")
+      .evaluateAll((nodes) =>
+        nodes.map((node) => {
+          const frame = getComputedStyle(node);
+          const picture = node.querySelector("picture");
+          const viewport = getComputedStyle(picture);
+          const image = getComputedStyle(picture.querySelector("img"));
+          return {
+            id: node.dataset.workPreviewFrame,
+            frameWidth: Number.parseFloat(frame.width),
+            frameHeight: Number.parseFloat(frame.height),
+            viewportWidth: Number.parseFloat(viewport.width),
+            viewportHeight: Number.parseFloat(viewport.height),
+            imageWidth: Number.parseFloat(image.width),
+            imageHeight: Number.parseFloat(image.height),
+            left: Number.parseFloat(image.left),
+            top: Number.parseFloat(image.top),
+          };
+        }),
+      );
+    assert.equal(metrics.length, 6);
+    const heights = metrics.map((metric) => metric.frameHeight);
+    assert(
+      Math.max(...heights) - Math.min(...heights) < 0.1,
+      `All six image frames must have equal CSS heights at ${label}`,
+    );
+    for (const metric of metrics) {
+      const preview = works.find((work) => work.id === metric.id).preview;
+      assert(Math.abs(metric.frameWidth / metric.frameHeight - 2) < 0.001);
+      assert(metric.viewportWidth <= metric.frameWidth + 0.1);
+      assert(metric.viewportHeight <= metric.frameHeight + 0.1);
+      assert(
+        Math.abs(
+          metric.viewportWidth / metric.viewportHeight -
+            preview.crop.width / preview.crop.height,
+        ) < 0.01,
+      );
+      assert(
+        Math.abs(
+          metric.imageWidth / metric.imageHeight -
+            preview.width / preview.height,
+        ) < 0.01,
+      );
+      assert(
+        Math.abs(
+          (-metric.left / metric.imageWidth) * preview.width - preview.crop.x,
+        ) < 1,
+      );
+      assert(
+        Math.abs(
+          (-metric.top / metric.imageHeight) * preview.height - preview.crop.y,
+        ) < 1,
+      );
+      assert(
+        Math.abs(
+          (metric.viewportWidth / metric.imageWidth) * preview.width -
+            preview.crop.width,
+        ) < 1,
+      );
+      assert(
+        Math.abs(
+          (metric.viewportHeight / metric.imageHeight) * preview.height -
+            preview.crop.height,
+        ) < 1,
+      );
+    }
+    frameMetrics.push({ label, metrics });
+  }
+  assert.deepEqual(
+    works.find((work) => work.id === "blue-archive-damage").preview.crop,
+    { x: 0, y: 360, width: 500, height: 340 },
+  );
+  await verifyImageFrames("desktop");
+  checks.push(
+    "All six image frames have equal heights, preserve proportional source crops, and retain the complete book title panel",
+  );
   const imageMetrics = [];
-  for (const tool of tools) {
-    const picture = page.locator(`[data-tool-preview="${tool.id}"]`);
+  for (const work of works) {
+    const picture = page.locator(`[data-work-preview="${work.id}"]`);
     const img = picture.locator("img");
     const state = await picture.evaluate((node) => ({
       firstChild: node.firstElementChild.tagName,
@@ -471,22 +718,22 @@ try {
     }));
     assert.equal(state.firstChild, "SOURCE");
     assert.equal(state.type, "image/avif");
-    assert(new URL(state.src).pathname.endsWith(tool.preview.avif));
-    assert.equal(state.width, tool.preview.width);
-    assert.equal(state.height, tool.preview.height);
+    assert(new URL(state.src).pathname.endsWith(work.preview.avif));
+    assert.equal(state.width, work.preview.width);
+    assert.equal(state.height, work.preview.height);
     assert(
       state.displayedImageWidth <= state.width + 1,
       "Crop display must not enlarge beyond source pixels",
     );
-    assert.equal(await img.getAttribute("width"), String(tool.preview.width));
-    assert.equal(await img.getAttribute("height"), String(tool.preview.height));
-    assert.equal(await img.getAttribute("alt"), tool.preview.alt);
+    assert.equal(await img.getAttribute("width"), String(work.preview.width));
+    assert.equal(await img.getAttribute("height"), String(work.preview.height));
+    assert.equal(await img.getAttribute("alt"), work.preview.alt);
     assert.equal(await img.getAttribute("loading"), "lazy");
     const sourceResponse = await context.request.get(state.src);
     assert.match(sourceResponse.headers()["content-type"], /image\/avif/);
     const formats = {};
     for (const format of ["png", "avif"]) {
-      const relative = tool.preview[format];
+      const relative = work.preview[format];
       const sourceBytes = await readFile(path.join(root, "public", relative));
       const builtBytes = await readFile(path.join(root, "dist", relative));
       assert(
@@ -496,24 +743,24 @@ try {
       formats[format] = sourceBytes.length;
     }
     imageMetrics.push({
-      id: tool.id,
+      id: work.id,
       width: state.width,
       height: state.height,
-      crop: tool.preview.crop,
+      crop: work.preview.crop,
       bytes: formats,
       selected: "avif",
     });
     await picture.screenshot({
-      path: path.join(qa, `tool-preview-${tool.id}-desktop.png`),
+      path: path.join(qa, `work-preview-${work.id}-desktop.png`),
     });
   }
   await page.evaluate(() => window.scrollTo(0, 0));
   await writeFile(
-    path.join(qa, "tool-image-results.json"),
+    path.join(qa, "work-image-results.json"),
     JSON.stringify(imageMetrics, null, 2),
   );
   checks.push(
-    "All four pictures select AVIF, reserve dimensions, retain exact PNG/AVIF bytes and avoid source-pixel enlargement",
+    "All six pictures select AVIF, reserve dimensions, retain exact PNG/AVIF bytes and avoid source-pixel enlargement",
   );
   await noOverflow("Desktop");
   await audit("Desktop homepage");
@@ -522,7 +769,7 @@ try {
     fullPage: true,
   });
   await page.screenshot({
-    path: path.join(qa, "review-tools-desktop.png"),
+    path: path.join(qa, "review-works-desktop.png"),
     fullPage: true,
   });
 
@@ -552,16 +799,16 @@ try {
   const fallbackPage = await fallbackContext.newPage();
   await fallbackPage.goto(main);
   await loadPreviewImages(fallbackPage);
-  for (const tool of tools) {
-    const img = fallbackPage.locator(`[data-tool-preview="${tool.id}"] img`);
+  for (const work of works) {
+    const img = fallbackPage.locator(`[data-work-preview="${work.id}"] img`);
     const state = await img.evaluate((node) => ({
       src: node.currentSrc,
       width: node.naturalWidth,
       height: node.naturalHeight,
     }));
-    assert(new URL(state.src).pathname.endsWith(tool.preview.png));
-    assert.equal(state.width, tool.preview.width);
-    assert.equal(state.height, tool.preview.height);
+    assert(new URL(state.src).pathname.endsWith(work.preview.png));
+    assert.equal(state.width, work.preview.width);
+    assert.equal(state.height, work.preview.height);
     assert.match(
       (await fallbackContext.request.get(state.src)).headers()["content-type"],
       /image\/png/,
@@ -577,9 +824,9 @@ try {
   });
   await fallbackContext.close();
   checks.push(
-    "All four native picture fallbacks select and decode PNG when AVIF MIME support is unavailable",
+    "All six native picture fallbacks select and decode PNG when AVIF MIME support is unavailable",
   );
-  const firstCard = await page.locator(".tool-card").first().boundingBox();
+  const firstCard = await page.locator(".work-card").first().boundingBox();
   await page.screenshot({
     path: path.join(qa, "paper-flat-pin-detail.png"),
     clip: {
@@ -602,18 +849,34 @@ try {
       .locator("main")
       .evaluate((node) => node === document.activeElement),
   );
-  for (const id of expectedTools) {
+  await page.keyboard.press("Tab");
+  const initialSort = page.getByRole("button", {
+    name: "公開日を古い順に並べる（新しい順と切り替え）",
+    exact: true,
+  });
+  assert(await initialSort.evaluate((node) => node === document.activeElement));
+  assert.equal(await initialSort.getAttribute("aria-pressed"), "false");
+  assert.equal(
+    await initialSort.locator("[data-work-sort-label]").textContent(),
+    "新しい順",
+  );
+  assert.notEqual(
+    await initialSort.evaluate((node) => getComputedStyle(node).outlineStyle),
+    "none",
+  );
+  assert((await initialSort.boundingBox()).height >= 44);
+  for (const id of expectedWorks) {
     await page.keyboard.press("Tab");
     const focus = await page.evaluate(() => ({
-      id: document.activeElement?.getAttribute("data-tool"),
+      id: document.activeElement?.getAttribute("data-work"),
       outline: getComputedStyle(document.activeElement, "::after").outlineStyle,
     }));
-    assert.equal(focus.id, id, "Tool cards must follow visual keyboard order");
+    assert.equal(focus.id, id, "Work cards must follow visual keyboard order");
     assert.notEqual(focus.outline, "none");
-    for (const tag of tools.find((tool) => tool.id === id).tags) {
+    for (const tag of works.find((work) => work.id === id).tags) {
       await page.keyboard.press("Tab");
       const tagFocus = await page.evaluate(() => ({
-        tag: document.activeElement?.getAttribute("data-tool-tag"),
+        tag: document.activeElement?.getAttribute("data-work-tag"),
         outline: getComputedStyle(document.activeElement).outlineStyle,
       }));
       assert.equal(
@@ -628,26 +891,26 @@ try {
     "Skip link, card links, classification tags, keyboard order and visible focus passed",
   );
 
-  async function visibleToolIds(target = page) {
+  async function visibleWorkIds(target = page) {
     return target
-      .locator(".tool-card:visible")
-      .evaluateAll((nodes) => nodes.map((node) => node.dataset.toolCard));
+      .locator(".work-card:visible")
+      .evaluateAll((nodes) => nodes.map((node) => node.dataset.workCard));
   }
-  const toolTag = page.locator('[data-tool-tag="ツール"]').first();
+  const toolTag = page.locator('[data-work-tag="ツール"]').first();
   const beforeTagInteractionUrl = page.url();
   await toolTag.focus();
   await page.keyboard.press("Space");
-  assert.deepEqual(await visibleToolIds(), [
+  assert.deepEqual(await visibleWorkIds(), [
     "kuto-measure",
     "image-rect-picker",
     "kuto-ladder",
   ]);
   assert.equal(
-    await page.locator('[data-tool-tag][aria-pressed="true"]').count(),
+    await page.locator('[data-work-tag][aria-pressed="true"]').count(),
     3,
   );
   assert(
-    (await page.locator("[data-tool-announcement]").textContent()).includes(
+    (await page.locator("[data-work-announcement]").textContent()).includes(
       "3件",
     ),
   );
@@ -657,40 +920,219 @@ try {
     "A tag must preserve the exact URL, including the skip-link fragment",
   );
   await page
-    .locator('[data-tool-card="kuto-measure"] [data-tool-tag="戦術対抗戦"]')
+    .locator('[data-work-card="kuto-measure"] [data-work-tag="戦術対抗戦"]')
     .click();
-  assert.deepEqual(await visibleToolIds(), [
+  assert.deepEqual(await visibleWorkIds(), [
     "kuto-measure",
-    "kuto-ladder",
     "kuto-nanidasu",
+    "kuto-ladder",
+    "kuto-glossary",
   ]);
   assert.equal(
-    await page.locator('[data-tool-tag="ツール"][aria-pressed="true"]').count(),
+    await page.locator('[data-work-tag="ツール"][aria-pressed="true"]').count(),
     0,
   );
-  await audit("Tool category selection");
-  const diagnosisTag = page.locator('[data-tool-tag="診断"]');
+  await audit("Work category selection");
+  const diagnosisTag = page.locator('[data-work-tag="診断"]');
   await diagnosisTag.focus();
   await page.keyboard.press("Enter");
-  assert.deepEqual(await visibleToolIds(), ["kuto-nanidasu"]);
+  assert.deepEqual(await visibleWorkIds(), ["kuto-nanidasu"]);
   assert.equal(page.url(), beforeTagInteractionUrl);
-  await page.locator("[data-clear-tool-filter]").click();
-  assert.deepEqual(await visibleToolIds(), expectedTools);
+  await page.locator("[data-clear-work-filter]").click();
+  assert.deepEqual(await visibleWorkIds(), expectedWorks);
   assert(
     await diagnosisTag.evaluate((node) => node === document.activeElement),
   );
   assert.equal(
-    await page.locator('[data-tool-tag][aria-pressed="true"]').count(),
+    await page.locator('[data-work-tag][aria-pressed="true"]').count(),
     0,
   );
-  assert(!(await page.locator("[data-tool-filter-status]").isVisible()));
-  const imageTag = page.locator('[data-tool-tag="画像"]');
+  assert(!(await page.locator("[data-work-filter-status]").isVisible()));
+  const imageTag = page.locator('[data-work-tag="画像"]');
   await imageTag.click();
-  assert.deepEqual(await visibleToolIds(), ["image-rect-picker"]);
+  assert.deepEqual(await visibleWorkIds(), ["image-rect-picker"]);
   await imageTag.click();
-  assert.deepEqual(await visibleToolIds(), expectedTools);
+  assert.deepEqual(await visibleWorkIds(), expectedWorks);
+  for (const [tag, ids] of Object.entries(expectedTagMatches)) {
+    const button = page
+      .locator("[data-work-tag]")
+      .filter({ hasText: tag })
+      .first();
+    await button.focus();
+    await page.keyboard.press("Enter");
+    assert.deepEqual(
+      await visibleWorkIds(),
+      ids,
+      `Unexpected matches for ${tag}`,
+    );
+    assert.equal(
+      await page.locator('[data-work-tag][aria-pressed="true"]').count(),
+      ids.length,
+    );
+    assert.equal(page.url(), beforeTagInteractionUrl);
+    if (tag === "記事") await audit("External article category selection");
+    await button.click();
+    assert.deepEqual(await visibleWorkIds(), expectedWorks);
+    assert(!(await page.locator("[data-work-filter-status]").isVisible()));
+  }
   checks.push(
-    "All four tool classifications, single selection, same-tag toggle, clear and focus restoration passed without card navigation",
+    "All seven classifications filter six works, toggle, clear and restore focus without navigation",
+  );
+
+  const sortButton = page.getByRole("button", {
+    name: "公開日を古い順に並べる（新しい順と切り替え）",
+    exact: true,
+  });
+  const oldestWorks = [...expectedWorks].reverse();
+  const domWorkIds = (target) =>
+    target
+      .locator("[data-work-card]")
+      .evaluateAll((nodes) => nodes.map((node) => node.dataset.workCard));
+  await sortButton.focus();
+  await page.keyboard.press("Space");
+  assert.equal(await sortButton.getAttribute("aria-pressed"), "true");
+  assert.equal(
+    await sortButton.locator("[data-work-sort-label]").textContent(),
+    "古い順",
+  );
+  assert.deepEqual(await domWorkIds(page), oldestWorks);
+  assert.deepEqual(await visibleWorkIds(), oldestWorks);
+  assert.match(
+    await page.locator("[data-work-announcement]").textContent(),
+    /古い順/,
+  );
+  assert.equal(page.url(), beforeTagInteractionUrl);
+  for (const id of oldestWorks) {
+    await page.keyboard.press("Tab");
+    assert.equal(
+      await page.evaluate(() =>
+        document.activeElement?.getAttribute("data-work"),
+      ),
+      id,
+    );
+    for (const tag of works.find((work) => work.id === id).tags) {
+      await page.keyboard.press("Tab");
+      assert.equal(
+        await page.evaluate(() =>
+          document.activeElement?.getAttribute("data-work-tag"),
+        ),
+        tag,
+      );
+    }
+  }
+  await sortButton.focus();
+  await page.keyboard.press("Enter");
+  assert.deepEqual(await domWorkIds(page), expectedWorks);
+  assert.equal(await sortButton.getAttribute("aria-pressed"), "false");
+  await sortButton.click();
+  await loadPreviewImages();
+  await page.screenshot({
+    path: path.join(qa, "review-works-oldest-desktop.png"),
+    fullPage: true,
+  });
+  await audit("Oldest-first work order");
+  checks.push(
+    "Paper sort button exposes a stable accessible name and toggle state; Space/Enter reorder the DOM and keyboard links follow the new visual order",
+  );
+
+  for (const [tag, ids] of Object.entries(expectedTagMatches)) {
+    const button = page
+      .locator("[data-work-tag]")
+      .filter({ hasText: tag })
+      .first();
+    await button.click();
+    assert.deepEqual(await visibleWorkIds(), [...ids].reverse());
+    assert.equal(await button.getAttribute("aria-pressed"), "true");
+    if (tag === "記事") {
+      await loadPreviewImages();
+      await page.screenshot({
+        path: path.join(qa, "review-works-oldest-articles-desktop.png"),
+        fullPage: true,
+      });
+    }
+    await sortButton.click();
+    assert.deepEqual(await visibleWorkIds(), ids);
+    assert.equal(await button.getAttribute("aria-pressed"), "true");
+    await sortButton.click();
+    assert.deepEqual(await visibleWorkIds(), [...ids].reverse());
+    await page.locator("[data-clear-work-filter]").click();
+    assert.deepEqual(await visibleWorkIds(), oldestWorks);
+    assert.equal(await sortButton.getAttribute("aria-pressed"), "true");
+  }
+  await page.reload();
+  assert.deepEqual(await visibleWorkIds(), expectedWorks);
+  assert.equal(await sortButton.getAttribute("aria-pressed"), "false");
+  checks.push(
+    "All seven tags retain their selected filter across both sort directions; clearing preserves the chosen order and reloading restores newest first",
+  );
+
+  const sortFixture = stableFixture.map((work, index) => ({
+    ...work,
+    id: expectedWorks[index],
+  }));
+  const fixturePage = await context.newPage();
+  fixturePage.on("pageerror", (error) => errors.push(error.message));
+  await fixturePage.route(main, async (route) => {
+    const response = await route.fetch();
+    const html = await response.text();
+    const fragments = new Map(
+      Array.from(
+        html.matchAll(/<li data-work-item[\s\S]*?<\/li>/g),
+        (match) => {
+          const id = match[0].match(/data-work-card="([^"]+)"/)[1];
+          const timestamp = sortFixture.find(
+            (work) => work.id === id,
+          ).publishedAt;
+          return [
+            id,
+            match[0].replace(
+              / data-work-published-at="[^"]*"/,
+              timestamp === null
+                ? ""
+                : ` data-work-published-at="${timestamp}"`,
+            ),
+          ];
+        },
+      ),
+    );
+    assert.equal(fragments.size, 6);
+    const ordered = sortWorksByPublishedAt(sortFixture).map((work) =>
+      fragments.get(work.id),
+    );
+    let index = 0;
+    await route.fulfill({
+      response,
+      body: html.replace(
+        /<li data-work-item[\s\S]*?<\/li>/g,
+        () => ordered[index++],
+      ),
+    });
+  });
+  await fixturePage.goto(main);
+  const fixtureNewest = [
+    "kuto-nanidasu",
+    "image-rect-picker",
+    "kuto-ladder",
+    "blue-archive-damage",
+    "kuto-measure",
+    "kuto-glossary",
+  ];
+  const fixtureOldest = [
+    "blue-archive-damage",
+    "image-rect-picker",
+    "kuto-ladder",
+    "kuto-nanidasu",
+    "kuto-measure",
+    "kuto-glossary",
+  ];
+  assert.deepEqual(await domWorkIds(fixturePage), fixtureNewest);
+  await fixturePage.locator("[data-work-sort]").click();
+  assert.deepEqual(await domWorkIds(fixturePage), fixtureOldest);
+  await fixturePage.locator("[data-work-sort]").click();
+  assert.deepEqual(await domWorkIds(fixturePage), fixtureNewest);
+  await fixturePage.close();
+  checks.push(
+    "Client sorting compares full timestamps, preserves equal instants across time zones and keeps unknown dates last in stable order for both directions",
   );
 
   const socials = page.locator(".social-links a");
@@ -736,49 +1178,79 @@ try {
     const url = new URL(request.url());
     if (sites.some((site) => url.origin === site.origin))
       return route.continue();
-    const tool = tools.find((item) => item.href === url.href);
-    if (tool && request.isNavigationRequest())
+    const work = works.find((item) => item.href === url.href);
+    if (work && request.isNavigationRequest())
       return route.fulfill({
         status: 200,
         contentType: "text/html",
-        body: `<h1 data-test-destination>${tool.id}</h1>`,
+        body: `<h1 data-test-destination>${work.id}</h1>`,
       });
     externalRequests.push(url.href);
     return route.abort();
   });
   const navigationPage = await navigationContext.newPage();
-  for (const tool of tools) {
+  for (const work of works) {
     await navigationPage.goto(main);
     await navigationPage
-      .locator(`[data-tool-card="${tool.id}"] .tool-preview`)
+      .locator(`[data-work-card="${work.id}"] .work-preview`)
       .scrollIntoViewIfNeeded();
     const preview = await navigationPage
-      .locator(`[data-tool-card="${tool.id}"] .tool-preview`)
+      .locator(`[data-work-card="${work.id}"] .work-preview`)
       .boundingBox();
     await navigationPage.mouse.click(
       preview.x + preview.width / 2,
       preview.y + preview.height / 2,
     );
-    await navigationPage.waitForURL(tool.href);
+    await navigationPage.waitForURL(work.href);
     assert.equal(
       await navigationPage.locator("[data-test-destination]").textContent(),
-      tool.id,
+      work.id,
     );
     await navigationPage.goto(main);
-    await navigationPage.locator(`[data-tool="${tool.id}"]`).focus();
+    await navigationPage.locator(`[data-work="${work.id}"]`).focus();
     await navigationPage.keyboard.press("Enter");
-    await navigationPage.waitForURL(tool.href);
+    await navigationPage.waitForURL(work.href);
   }
   await navigationContext.close();
   checks.push(
-    "The entire card and keyboard Enter navigate to each unchanged tool URL using mocked destinations; no public tool is fetched",
+    "The entire card and keyboard Enter navigate to each unchanged work URL using mocked destinations; no public work is fetched",
   );
 
   for (const width of [390, 320]) {
     await page.setViewportSize({ width, height: 844 });
     await page.goto(main);
     await noOverflow(`Mobile ${width}`);
-    const cards = await page.locator(".tool-card").all();
+    await verifyImageFrames(`mobile ${width}`);
+    const mobileSort = page.locator("[data-work-sort]");
+    assert((await mobileSort.boundingBox()).height >= 44);
+    await mobileSort.click();
+    assert.deepEqual(await visibleWorkIds(), [...expectedWorks].reverse());
+    await noOverflow(`Oldest mobile ${width}`);
+    await loadPreviewImages();
+    await page.screenshot({
+      path: path.join(qa, `review-works-oldest-mobile-${width}.png`),
+      fullPage: true,
+    });
+    await page.locator('[data-work-tag="記事"]').first().click();
+    assert.deepEqual(await visibleWorkIds(), [
+      "kuto-glossary",
+      "blue-archive-damage",
+    ]);
+    if (width === 390) {
+      await audit("Oldest article filter on mobile");
+      await page.screenshot({
+        path: path.join(qa, "review-works-oldest-articles-mobile.png"),
+        fullPage: true,
+      });
+    }
+    await mobileSort.click();
+    assert.deepEqual(await visibleWorkIds(), [
+      "blue-archive-damage",
+      "kuto-glossary",
+    ]);
+    await page.locator("[data-clear-work-filter]").click();
+    assert.deepEqual(await visibleWorkIds(), expectedWorks);
+    const cards = await page.locator(".work-card").all();
     const positions = await Promise.all(
       cards.map((card) => card.boundingBox()),
     );
@@ -792,6 +1264,10 @@ try {
     await localLinksAndAssets();
     await page.goto(main);
     await loadPreviewImages();
+    await page.screenshot({
+      path: path.join(qa, `review-works-mobile-${width}.png`),
+      fullPage: true,
+    });
     if (width === 390) {
       await audit("Mobile homepage");
       await page.screenshot({
@@ -799,17 +1275,21 @@ try {
         fullPage: true,
       });
       await page.screenshot({
-        path: path.join(qa, "review-tools-mobile.png"),
+        path: path.join(qa, "review-works-mobile.png"),
         fullPage: true,
       });
-      for (const tool of tools) {
-        await page.locator(`[data-tool-preview="${tool.id}"]`).screenshot({
-          path: path.join(qa, `tool-preview-${tool.id}-mobile.png`),
+      for (const work of works) {
+        await page.locator(`[data-work-preview="${work.id}"]`).screenshot({
+          path: path.join(qa, `work-preview-${work.id}-mobile.png`),
         });
       }
       await page.evaluate(() => window.scrollTo(0, 0));
     }
   }
+  await writeFile(
+    path.join(qa, "work-frame-results.json"),
+    JSON.stringify(frameMetrics, null, 2),
+  );
   checks.push("320px and 390px layout and navigation passed");
 
   await page.setViewportSize({ width: 1280, height: 1000 });
@@ -817,7 +1297,7 @@ try {
     document.documentElement.style.fontSize = "200%";
   });
   await noOverflow("200% text");
-  for (const card of await page.locator("a[data-tool]").all())
+  for (const card of await page.locator("a[data-work]").all())
     assert(await card.isVisible());
   checks.push("200% text resizing passed");
   await page.screenshot({
@@ -1054,7 +1534,7 @@ try {
         .trim(),
       paper: getComputedStyle(
         document.querySelector(
-          ".tool-card, .article-page, .article-card, .empty-note",
+          ".work-card, .article-page, .article-card, .empty-note",
         ),
         "::before",
       ).backgroundColor,
@@ -1188,10 +1668,50 @@ try {
     await touchPage.evaluate(() => localStorage.getItem("kei-pinboard:theme")),
     "dark",
   );
-  await touchPage.locator('[data-tool-tag="画像"]').tap();
-  assert.deepEqual(await visibleToolIds(touchPage), ["image-rect-picker"]);
-  await touchPage.locator("[data-clear-tool-filter]").tap();
-  assert.deepEqual(await visibleToolIds(touchPage), expectedTools);
+  assert.deepEqual(await visibleWorkIds(touchPage), expectedWorks);
+  await touchPage.locator('[data-work-tag="画像"]').tap();
+  assert.deepEqual(await visibleWorkIds(touchPage), ["image-rect-picker"]);
+  await touchPage.locator("[data-clear-work-filter]").tap();
+  assert.deepEqual(await visibleWorkIds(touchPage), expectedWorks);
+  for (const [tag, ids] of Object.entries(expectedTagMatches)) {
+    await touchPage
+      .locator("[data-work-tag]")
+      .filter({ hasText: tag })
+      .first()
+      .tap();
+    assert.deepEqual(await visibleWorkIds(touchPage), ids);
+    await touchPage.locator("[data-clear-work-filter]").tap();
+    assert.deepEqual(await visibleWorkIds(touchPage), expectedWorks);
+  }
+  checks.push("All seven work tags and clear work on a touch device");
+  const touchSort = touchPage.locator("[data-work-sort]");
+  await touchSort.tap();
+  assert.deepEqual(
+    await visibleWorkIds(touchPage),
+    [...expectedWorks].reverse(),
+  );
+  assert.equal(await touchSort.getAttribute("aria-pressed"), "true");
+  await touchPage.locator('[data-work-tag="記事"]').first().tap();
+  assert.deepEqual(await visibleWorkIds(touchPage), [
+    "kuto-glossary",
+    "blue-archive-damage",
+  ]);
+  await touchSort.tap();
+  assert.deepEqual(await visibleWorkIds(touchPage), [
+    "blue-archive-damage",
+    "kuto-glossary",
+  ]);
+  await touchSort.tap();
+  await touchPage.locator("[data-clear-work-filter]").tap();
+  assert.deepEqual(
+    await visibleWorkIds(touchPage),
+    [...expectedWorks].reverse(),
+  );
+  await touchSort.tap();
+  assert.deepEqual(await visibleWorkIds(touchPage), expectedWorks);
+  checks.push(
+    "Mobile taps toggle both directions, preserve the article filter and keep oldest order when the filter is cleared",
+  );
   await assertFixedLight(
     touchPage,
     "Touch device with saved dark choice stays light",
@@ -1212,7 +1732,7 @@ try {
   await assertFixedLight(touchPage, "Tag taps keep the light palette");
   await touchPage.locator(".brand").tap();
   await touchPage.waitForURL(contentSite);
-  assert.equal(await touchPage.locator("a[data-tool]").count(), 4);
+  assert.equal(await touchPage.locator("a[data-work]").count(), 6);
   await touchContext.close();
   checks.push(
     "Touch navigation stays light on dark OS with a saved dark choice",
@@ -1247,9 +1767,15 @@ try {
     ),
     "#ead8bd",
   );
-  assert.equal(await noJsPage.locator("a[data-tool]").count(), 4);
-  assert.equal(await noJsPage.locator("[data-tool-tag]:disabled").count(), 8);
-  assert(!(await noJsPage.locator("[data-tool-filter-status]").isVisible()));
+  assert.equal(await noJsPage.locator("a[data-work]").count(), 6);
+  assert.deepEqual(await visibleWorkIds(noJsPage), expectedWorks);
+  assert(!(await noJsPage.locator("[data-work-controls]").isVisible()));
+  assert.equal(
+    await noJsPage.locator("[data-work-sort]").getAttribute("disabled"),
+    "",
+  );
+  assert.equal(await noJsPage.locator("[data-work-tag]:disabled").count(), 17);
+  assert(!(await noJsPage.locator("[data-work-filter-status]").isVisible()));
   await noJsPage.goto(`${main}articles/`);
   await noJsPage.locator("[data-empty-articles]").waitFor({ state: "visible" });
   assert(await noJsPage.locator("[data-empty-articles]").isVisible());
