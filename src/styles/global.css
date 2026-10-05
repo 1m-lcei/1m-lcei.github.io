@@ -384,25 +384,27 @@
     transition: filter 160ms ease;
     transform-origin: 50% var(--work-pivot-y);
   }
+  .work-card.work-swing-start {
+    transform: rotate(calc(var(--work-swing-direction, 1) * 0.85deg));
+  }
   .work-card.work-swing {
-    animation: work-card-sway 640ms ease-in-out;
+    animation: work-card-sway 1000ms ease-in-out backwards;
   }
   @keyframes work-card-sway {
-    0%,
-    100% {
-      transform: rotate(0deg);
-    }
-    18% {
+    0% {
       transform: rotate(calc(var(--work-swing-direction, 1) * 0.85deg));
     }
-    42% {
+    36% {
       transform: rotate(calc(var(--work-swing-direction, 1) * -0.5deg));
     }
-    66% {
+    64% {
       transform: rotate(calc(var(--work-swing-direction, 1) * 0.25deg));
     }
     84% {
       transform: rotate(calc(var(--work-swing-direction, 1) * -0.08deg));
+    }
+    100% {
+      transform: rotate(0deg);
     }
   }
   .work-card:hover,
@@ -1009,6 +1011,7 @@
     }
     .work-card {
       animation: none;
+      transform: none;
     }
   }
   @media (forced-colors: active) {
@@ -1027,6 +1030,7 @@
       filter: none;
       rotate: none;
       animation: none;
+      transform: none;
     }
     .index-tab[aria-pressed="true"] {
       outline: 2px solid Highlight;
@@ -1060,6 +1064,7 @@
       filter: none;
       rotate: none;
       animation: none;
+      transform: none;
     }
     .paper::before,
     .paper::after {

@@ -864,7 +864,7 @@ try {
           .some((animation) => animation.animationName === "work-card-sway"),
       ),
     );
-    const samples = await target.evaluate(async () => {
+    const observation = await target.evaluate(async () => {
       const card = Array.from(
         document.querySelectorAll("[data-work-card]"),
       ).find((node) => !node.closest("[data-work-item]").hidden);
@@ -875,6 +875,7 @@ try {
         .getAnimations()
         .find((animation) => animation.animationName === "work-card-sway");
       sway.currentTime = 0;
+      const duration = sway.effect.getTiming().duration;
       const samples = [];
       const started = performance.now();
       for (;;) {
@@ -901,12 +902,18 @@ try {
           staticRotate: style.rotate,
         });
         if (!animation) break;
-        if (performance.now() - started > 1600)
+        if (performance.now() - started > duration * 3)
           throw new Error("Paper sway did not settle");
         await new Promise((resolve) => requestAnimationFrame(resolve));
       }
-      return samples;
+      return { samples, duration };
     });
+    const { samples, duration } = observation;
+    assert.equal(duration, 1000, `${label}: relaxed cycle duration`);
+    assert(
+      Math.abs(Math.abs(samples[0].angle) - 0.85) < 0.001,
+      `${label}: starts from a side`,
+    );
     const pinsX = samples.map((sample) => sample.pinX);
     const pinsY = samples.map((sample) => sample.pinY);
     const angles = samples.map((sample) => Math.abs(sample.angle));
@@ -941,12 +948,16 @@ try {
     );
     const early = samples
       .filter(
-        (sample) => sample.animationTime !== null && sample.animationTime < 300,
+        (sample) =>
+          sample.animationTime !== null &&
+          sample.animationTime < duration * 0.5,
       )
       .map((sample) => Math.abs(sample.angle));
     const late = samples
       .filter(
-        (sample) => sample.animationTime !== null && sample.animationTime > 390,
+        (sample) =>
+          sample.animationTime !== null &&
+          sample.animationTime > duration * 0.6,
       )
       .map((sample) => Math.abs(sample.angle));
     assert(
@@ -962,6 +973,7 @@ try {
     assert.equal(await activeSways(target), 0);
     const result = {
       label,
+      duration,
       samples,
       maximumAngle: Math.max(...angles),
       pinDrift: Math.max(
@@ -978,6 +990,7 @@ try {
     0,
     "Initial load and preference changes must not start card sway",
   );
+  assert.equal(await page.locator(".work-swing-start").count(), 0);
   assert.equal(await page.locator(".work-card > .pin").count(), 0);
   assert.equal(await page.locator("[data-work-item] > .work-pin").count(), 6);
   checks.push(
@@ -986,8 +999,24 @@ try {
   for (const width of [1440, 390, 320]) {
     await page.setViewportSize({ width, height: 1000 });
     await page.goto(main);
-    await page.locator("[data-work-sort]").click();
+    const startAngles = await page.evaluate(() => {
+      document.querySelector("[data-work-sort]").click();
+      return Array.from(document.querySelectorAll(".work-card"), (card) => {
+        const matrix = new DOMMatrix(getComputedStyle(card).transform);
+        return (Math.atan2(matrix.b, matrix.a) * 180) / Math.PI;
+      });
+    });
+    assert(
+      startAngles.every((angle) => Math.abs(Math.abs(angle) - 0.85) < 0.001),
+      "The starting tilt must be set before any paint",
+    );
+    assert.equal(
+      new Set(startAngles.map(Math.sign)).size,
+      2,
+      "Starting sides alternate",
+    );
     await observeCardSway(page, `Sway ${width}px`);
+    motionMetrics.at(-1).startAngles = startAngles;
     await noOverflow(`Settled sway ${width}px`);
     checks.push(
       `${width}px paper sway follows a fixed pin center, retains static tilt, changes direction, decays and fully settles`,
@@ -1042,7 +1071,9 @@ try {
     "Focus must leave a newly hidden card",
   );
   assert.equal(
-    await page.locator("[data-work-item][hidden] .work-swing").count(),
+    await page
+      .locator("[data-work-item][hidden] :is(.work-swing, .work-swing-start)")
+      .count(),
     0,
   );
   await observeCardSway(page, "Rapid filter/sort/clear");
@@ -1064,7 +1095,9 @@ try {
       .some((animation) => animation.animationName === "work-card-sway"),
   );
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.waitForFunction(() => !document.querySelector(".work-swing"));
+  await page.waitForFunction(
+    () => !document.querySelector(".work-swing, .work-swing-start"),
+  );
   assert.equal(await activeSways(page), 0);
   await page.locator("[data-work-sort]").click();
   await page.locator('[data-work-tag="記事"]').first().click();

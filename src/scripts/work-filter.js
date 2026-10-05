@@ -36,19 +36,26 @@ for (const root of document.querySelectorAll("[data-work-filter]")) {
   function resetSwing() {
     cancelAnimationFrame(swingFrame);
     swingFrame = 0;
-    for (const { card } of items) card.classList.remove("work-swing");
+    for (const { card } of items) {
+      card.classList.remove("work-swing", "work-swing-start");
+    }
   }
 
   function swingCards() {
     resetSwing();
     if (reducedMotion.matches) return;
+    // Set the starting tilt before the next paint, while changes still coalesce.
+    for (const { node, card } of items) {
+      if (!node.hidden) card.classList.add("work-swing-start");
+    }
     swingFrame = requestAnimationFrame(() => {
       swingFrame = 0;
       if (reducedMotion.matches) return;
       // Flush the removed animation once; rapid changes share one final frame.
       list.getBoundingClientRect();
       for (const { node, card } of items) {
-        if (!node.hidden) card.classList.add("work-swing");
+        if (!node.hidden)
+          card.classList.replace("work-swing-start", "work-swing");
       }
     });
   }
