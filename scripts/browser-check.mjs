@@ -21,7 +21,7 @@ const channel =
   (process.platform === "win32" ? "msedge" : "chromium");
 const qaRoot = path.join(root, ".cache", "qa");
 const qa = path.join(qaRoot, channel);
-const base = "/kei-pinboard/";
+const base = "/";
 const expectedWorks = [
   "kuto-measure",
   "image-rect-picker",
@@ -293,13 +293,13 @@ try {
   const homepageMeta = {
     title: siteName,
     description: siteDescription,
-    url: "https://1m-lcei.github.io/kei-pinboard/",
+    url: "https://1m-lcei.github.io/",
   };
   await checkMetadata(path.join(root, "dist", "index.html"), homepageMeta);
   await checkMetadata(path.join(root, "dist", "articles", "index.html"), {
     title: `読みもの | ${siteName}`,
     description: `${siteName} の読みもの一覧。`,
-    url: "https://1m-lcei.github.io/kei-pinboard/articles/",
+    url: "https://1m-lcei.github.io/articles/",
   });
   checks.push(
     "Built homepage and article-list metadata is unique, uses the Pages canonical and has no social image",
@@ -344,7 +344,7 @@ try {
     };
     await checkMetadata(file, {
       ...articleMeta,
-      url: `https://1m-lcei.github.io/kei-pinboard/articles/${id}/`,
+      url: `https://1m-lcei.github.io/articles/${id}/`,
     });
     await checkMetadata(
       path.join(fixture, "dist", "articles", id, "index.html"),
@@ -413,6 +413,10 @@ try {
       const url = new URL(value, page.url());
       if (!sites.some((site) => url.origin === site.origin)) continue;
       assert(url.pathname.startsWith(base), `URL lost Pages base: ${url}`);
+      assert(
+        !url.pathname.startsWith("/kei-pinboard/"),
+        `Legacy project path remains: ${url}`,
+      );
       if (url.hash && url.pathname === new URL(page.url()).pathname) {
         assert(
           await page.evaluate(

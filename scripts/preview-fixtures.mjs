@@ -12,7 +12,7 @@ const fixture = await createPreviewFixture(
   path.join(root, ".cache", "demo", "site-"),
 );
 const directory = path.join(fixture, "dist");
-const base = "/kei-pinboard/";
+const base = "/";
 const types = {
   ".html": "text/html; charset=utf-8",
   ".css": "text/css",

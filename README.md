@@ -1,6 +1,6 @@
 # Kei's Pinboard
 
-4つのWebツールと2つの外部記事を同じカード一覧に置く静的ポータル。Markdown記事の基盤も保持する。Astro・TypeScript・素のCSS・Bunを使用する。表札は `@1m_lcei`、プロジェクト名とbaseは `kei-pinboard`。予定公開URLは `https://1m-lcei.github.io/kei-pinboard/`。
+4つのWebツールと2つの外部記事を同じカード一覧に置く静的ポータル。Markdown記事の基盤も保持する。Astro・TypeScript・素のCSS・Bunを使用する。表札は `@1m_lcei`、ローカルフォルダ・プロジェクト名は `kei-pinboard`、GitHubリポジトリは `1m-lcei/1m-lcei.github.io`。公開URLは `https://1m-lcei.github.io/`、baseは `/`。
 
 ## 開発・検証
 
@@ -8,7 +8,7 @@ Bunは `package.json` の1.4.2、依存は `bun.lock` に固定する。
 
 ```sh
 bun install --frozen-lockfile
-bun run dev       # http://127.0.0.1:4321/kei-pinboard/
+bun run dev       # http://127.0.0.1:4321/
 bun run verify    # 型・Biome・本番ビルド・ブラウザ/HTML検証
 bun run preview   # ビルドしたdistを確認
 bun run demo      # 4322: 隔離した仮記事のプレビュー
@@ -35,7 +35,7 @@ TypeScriptは6.0.3を保持する。正式な `typescript` 7.0.2は存在する�
 
 タグ絞込・解除と並び順切替の際に、ピンを固定したまま紙だけが左右交互の小さな傾きからゆっくり揺り戻し、約1秒で収まる。切替直後から開始角を付け、中央から振り出す姿勢が一瞬見えるのを避ける。初期表示では動かさず、連続操作は最後の状態に集約する。動きを減らす設定では再生しない。CSS keyframesと既存の少量JSだけで実装し、新しい依存は追加していない。
 
-記事の必須項目は `title`、`description`、`date`。公開するものだけ `draft: false` にし、`tags` は任意。下書きと仮記事は本番に含めない。記事は `/kei-pinboard/articles/` に並び、トップはツールと外部記事を同じ一覧に表示する。既存4ツールのリポジトリは変更しない。
+記事の必須項目は `title`、`description`、`date`。公開するものだけ `draft: false` にし、`tags` は任意。下書きと仮記事は本番に含めない。記事は `/articles/` に並び、トップはツールと外部記事を同じ一覧に表示する。既存4ツールのリポジトリは変更しない。
 
 メタデータはページ別title/description・canonical・OGP・画像なしのX summary。記事は `article` と公開日、404と仮記事プレビューは `noindex` とし、公開URLのcanonicalを付けない。OGP画像は用意しない。
 
@@ -43,10 +43,10 @@ TypeScriptは6.0.3を保持する。正式な `typescript` 7.0.2は存在する�
 
 `.github/workflows/pages.yml` はPRと `main` pushで固定依存のインストール、型/整形/lint、ビルド、Chromium・Firefox検証を行う。PRは検証のみ。`main` pushの検証成功後だけ、同じ `dist/` をPages artifactとして公開する。検証用のコピー・画像・ソースは公開しない。
 
-GitHub側で必要な設定（本作業では未実施）:
+GitHubリポジトリは [`1m-lcei/1m-lcei.github.io`](https://github.com/1m-lcei/1m-lcei.github.io)。ユーザーサイトとして [`https://1m-lcei.github.io/`](https://1m-lcei.github.io/) に公開する。ローカルフォルダとサイト名は変更しない。旧 `/kei-pinboard/` に互換ページや誘導は置かない。
 
-1. `1m-lcei/kei-pinboard` の `main` に本設定を置く。
-2. **Settings → Pages → Build and deployment → Source** を **GitHub Actions** にする。
-3. `github-pages` 環境でブランチ制限を設定する場合は `main` を許可する。
+1. **Settings → Pages → Build and deployment → Source** は **GitHub Actions**。
+2. `github-pages` 環境でブランチ制限を設定する場合は `main` を許可する。
+3. `origin` は `https://github.com/1m-lcei/1m-lcei.github.io.git`。
 
-リポジトリ作成・設定変更・commit・push・初回公開は別途行う。[GitHub Pages公式手順](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages)を参照。CI実行と公開URLでの確認は初回push後に行う。
+公開設定とデプロイは対象作業への明示的な許可の範囲で行う。[GitHub Pages公式手順](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages)を参照。通常push後に、同じコミットのCI成功と公開URLのHTML・画像・リンクを確認する。
