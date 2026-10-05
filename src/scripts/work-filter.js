@@ -3,6 +3,7 @@ for (const root of document.querySelectorAll("[data-work-filter]")) {
     root.querySelectorAll("[data-work-item]"),
     (node, index) => ({
       node,
+      card: node.querySelector("[data-work-card]"),
       index,
       tags: JSON.parse(node.dataset.workTags),
       timestamp: node.dataset.workPublishedAt
@@ -29,6 +30,29 @@ for (const root of document.querySelectorAll("[data-work-filter]")) {
   let oldest = false;
   let selected = "";
   let trigger;
+  let swingFrame = 0;
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+  function resetSwing() {
+    cancelAnimationFrame(swingFrame);
+    swingFrame = 0;
+    for (const { card } of items) card.classList.remove("work-swing");
+  }
+
+  function swingCards() {
+    resetSwing();
+    if (reducedMotion.matches) return;
+    swingFrame = requestAnimationFrame(() => {
+      swingFrame = 0;
+      if (reducedMotion.matches) return;
+      // Flush the removed animation once; rapid changes share one final frame.
+      list.getBoundingClientRect();
+      for (const { node, card } of items) {
+        if (!node.hidden) card.classList.add("work-swing");
+      }
+    });
+  }
+  reducedMotion.addEventListener("change", resetSwing);
 
   function select(tag) {
     selected = tag;
@@ -47,6 +71,14 @@ for (const root of document.querySelectorAll("[data-work-filter]")) {
     label.textContent = message;
     announcement.textContent = `${message}、${oldest ? "古い順" : "新しい順"}`;
     status.hidden = !tag;
+    if (
+      items.some(
+        ({ node }) => node.hidden && node.contains(document.activeElement),
+      )
+    ) {
+      clear.focus();
+    }
+    swingCards();
   }
 
   controls.hidden = false;

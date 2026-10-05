@@ -212,6 +212,7 @@ try {
     viewport: { width: 1440, height: 1000 },
     colorScheme: "light",
     locale: "ja-JP",
+    reducedMotion: "reduce",
   });
   await context.route("**/*", (route) => {
     const url = new URL(route.request().url());
@@ -837,6 +838,247 @@ try {
     },
   });
 
+  const motionMetrics = [];
+  const activeSways = (target) =>
+    target
+      .locator("[data-work-card]")
+      .evaluateAll((cards) =>
+        cards.reduce(
+          (count, card) =>
+            count +
+            card
+              .getAnimations()
+              .filter(
+                (animation) =>
+                  animation.animationName === "work-card-sway" &&
+                  animation.playState !== "finished",
+              ).length,
+          0,
+        ),
+      );
+  async function observeCardSway(target, label) {
+    await target.waitForFunction(() =>
+      Array.from(document.querySelectorAll("[data-work-card]")).some((card) =>
+        card
+          .getAnimations()
+          .some((animation) => animation.animationName === "work-card-sway"),
+      ),
+    );
+    const samples = await target.evaluate(async () => {
+      const card = Array.from(
+        document.querySelectorAll("[data-work-card]"),
+      ).find((node) => !node.closest("[data-work-item]").hidden);
+      const item = card.closest("[data-work-item]");
+      const pin = item.querySelector(".work-pin");
+      const samples = [];
+      const started = performance.now();
+      for (;;) {
+        const style = getComputedStyle(card);
+        const matrix = new DOMMatrix(style.transform);
+        const origin = style.transformOrigin.split(" ").map(Number.parseFloat);
+        const pinBounds = pin.getBoundingClientRect();
+        const itemBounds = item.getBoundingClientRect();
+        const bottomBounds = card
+          .querySelector(".card-bottom")
+          .getBoundingClientRect();
+        const animation = card
+          .getAnimations()
+          .find((value) => value.animationName === "work-card-sway");
+        samples.push({
+          elapsed: performance.now() - started,
+          angle: (Math.atan2(matrix.b, matrix.a) * 180) / Math.PI,
+          animationTime: animation?.currentTime ?? null,
+          pinX: pinBounds.x + pinBounds.width / 2,
+          pinY: pinBounds.y + pinBounds.height / 2,
+          pivotX: itemBounds.x + card.offsetLeft + origin[0],
+          pivotY: itemBounds.y + card.offsetTop + origin[1],
+          bottomX: bottomBounds.x + bottomBounds.width / 2,
+          staticRotate: style.rotate,
+        });
+        if (!animation) break;
+        if (performance.now() - started > 1600)
+          throw new Error("Paper sway did not settle");
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+      }
+      return samples;
+    });
+    const pinsX = samples.map((sample) => sample.pinX);
+    const pinsY = samples.map((sample) => sample.pinY);
+    const angles = samples.map((sample) => Math.abs(sample.angle));
+    assert(
+      Math.max(...pinsX) - Math.min(...pinsX) < 0.1,
+      `${label}: pin horizontal movement`,
+    );
+    assert(
+      Math.max(...pinsY) - Math.min(...pinsY) < 0.1,
+      `${label}: pin vertical movement`,
+    );
+    assert(
+      samples.every(
+        (sample) =>
+          Math.hypot(sample.pivotX - sample.pinX, sample.pivotY - sample.pinY) <
+          0.15,
+      ),
+      `${label}: paper must rotate around pin center`,
+    );
+    assert(
+      Math.max(...angles) > 0.25 && Math.max(...angles) <= 0.86,
+      `${label}: subtle visible amplitude`,
+    );
+    assert(
+      samples.some((sample) => sample.angle > 0.1) &&
+        samples.some((sample) => sample.angle < -0.1),
+      `${label}: paper must swing both ways`,
+    );
+    assert(
+      new Set(samples.map((sample) => sample.staticRotate)).size === 1,
+      `${label}: static tilt must be preserved`,
+    );
+    const early = samples
+      .filter(
+        (sample) => sample.animationTime !== null && sample.animationTime < 300,
+      )
+      .map((sample) => Math.abs(sample.angle));
+    const late = samples
+      .filter(
+        (sample) => sample.animationTime !== null && sample.animationTime > 390,
+      )
+      .map((sample) => Math.abs(sample.angle));
+    assert(
+      early.length &&
+        late.length &&
+        Math.max(...late) < Math.max(...early) * 0.7,
+      `${label}: late sway must decay`,
+    );
+    assert(
+      Math.abs(samples.at(-1).angle) < 0.001,
+      `${label}: final animated rotation must be zero`,
+    );
+    assert.equal(await activeSways(target), 0);
+    const result = {
+      label,
+      samples,
+      maximumAngle: Math.max(...angles),
+      pinDrift: Math.max(
+        Math.max(...pinsX) - Math.min(...pinsX),
+        Math.max(...pinsY) - Math.min(...pinsY),
+      ),
+    };
+    motionMetrics.push(result);
+  }
+
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  assert.equal(
+    await activeSways(page),
+    0,
+    "Initial load and preference changes must not start card sway",
+  );
+  assert.equal(await page.locator(".work-card > .pin").count(), 0);
+  assert.equal(await page.locator("[data-work-item] > .work-pin").count(), 6);
+  checks.push(
+    "Initial load has no sway; each pin is a stationary sibling of its paper card",
+  );
+  for (const width of [1440, 390, 320]) {
+    await page.setViewportSize({ width, height: 1000 });
+    await page.goto(main);
+    await page.locator("[data-work-sort]").click();
+    await observeCardSway(page, `Sway ${width}px`);
+    await noOverflow(`Settled sway ${width}px`);
+    checks.push(
+      `${width}px paper sway follows a fixed pin center, retains static tilt, changes direction, decays and fully settles`,
+    );
+  }
+
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto(main);
+  await page.evaluate(() => {
+    const root = document.querySelector("[data-work-filter]");
+    const article = root.querySelector('[data-work-tag="記事"]');
+    const sort = root.querySelector("[data-work-sort]");
+    const clear = root.querySelector("[data-clear-work-filter]");
+    for (let index = 0; index < 30; index++) {
+      article.click();
+      sort.click();
+      clear.click();
+    }
+    clear.click();
+    root.querySelector('[data-work="kuto-measure"]').focus();
+    article.click();
+    if (sort.getAttribute("aria-pressed") !== "true") sort.click();
+  });
+  await page.waitForFunction(
+    () => document.querySelectorAll(".work-card.work-swing").length === 2,
+  );
+  assert.deepEqual(
+    await page
+      .locator(".work-card:visible")
+      .evaluateAll((nodes) => nodes.map((node) => node.dataset.workCard)),
+    ["kuto-glossary", "blue-archive-damage"],
+  );
+  assert.deepEqual(
+    await page
+      .locator("[data-work-card]")
+      .evaluateAll((nodes) => nodes.map((node) => node.dataset.workCard)),
+    [...expectedWorks].reverse(),
+  );
+  assert.equal(
+    await page.locator('[data-work-tag="記事"][aria-pressed="true"]').count(),
+    2,
+  );
+  assert.equal(
+    await page.locator("[data-work-sort]").getAttribute("aria-pressed"),
+    "true",
+  );
+  assert.equal(
+    await page
+      .locator("[data-clear-work-filter]")
+      .evaluate((node) => node === document.activeElement),
+    true,
+    "Focus must leave a newly hidden card",
+  );
+  assert.equal(
+    await page.locator("[data-work-item][hidden] .work-swing").count(),
+    0,
+  );
+  await observeCardSway(page, "Rapid filter/sort/clear");
+  assert.deepEqual(
+    await page
+      .locator(".work-card:visible")
+      .evaluateAll((nodes) => nodes.map((node) => node.dataset.workCard)),
+    ["kuto-glossary", "blue-archive-damage"],
+  );
+  checks.push(
+    "Rapid filter/sort/clear is coalesced, preserves final DOM/tag/sort state, leaves hidden cards without animation and restores visible focus",
+  );
+
+  await page.locator("[data-clear-work-filter]").click();
+  await page.waitForFunction(() =>
+    document
+      .querySelector(".work-card")
+      .getAnimations()
+      .some((animation) => animation.animationName === "work-card-sway"),
+  );
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.waitForFunction(() => !document.querySelector(".work-swing"));
+  assert.equal(await activeSways(page), 0);
+  await page.locator("[data-work-sort]").click();
+  await page.locator('[data-work-tag="記事"]').first().click();
+  await page.locator("[data-clear-work-filter]").click();
+  assert.equal(await activeSways(page), 0);
+  assert.equal(await page.locator(".work-swing").count(), 0);
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  assert.equal(
+    await activeSways(page),
+    0,
+    "Changing the preference back must not replay old motion",
+  );
+  checks.push(
+    "Reduced motion immediately stops active sway, disables subsequent switches and does not replay motion when the preference changes back",
+  );
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto(main);
+  await loadPreviewImages();
+
   await page.keyboard.press("Tab");
   assert(
     await page
@@ -1077,7 +1319,7 @@ try {
     const html = await response.text();
     const fragments = new Map(
       Array.from(
-        html.matchAll(/<li data-work-item[\s\S]*?<\/li>/g),
+        html.matchAll(/<li[^>]* data-work-item[\s\S]*?<\/li>/g),
         (match) => {
           const id = match[0].match(/data-work-card="([^"]+)"/)[1];
           const timestamp = sortFixture.find(
@@ -1103,7 +1345,7 @@ try {
     await route.fulfill({
       response,
       body: html.replace(
-        /<li data-work-item[\s\S]*?<\/li>/g,
+        /<li[^>]* data-work-item[\s\S]*?<\/li>/g,
         () => ordered[index++],
       ),
     });
@@ -1250,7 +1492,7 @@ try {
     ]);
     await page.locator("[data-clear-work-filter]").click();
     assert.deepEqual(await visibleWorkIds(), expectedWorks);
-    const cards = await page.locator(".work-card").all();
+    const cards = await page.locator("[data-work-item]").all();
     const positions = await Promise.all(
       cards.map((card) => card.boundingBox()),
     );
@@ -1581,6 +1823,7 @@ try {
         colorScheme: systemTheme,
         viewport: { width: 1440, height: 1000 },
         locale: "ja-JP",
+        reducedMotion: "reduce",
       });
       if (savedTheme) await seedSavedTheme(lightContext, sites[1].origin);
       const lightPage = await lightContext.newPage();
@@ -1657,6 +1900,7 @@ try {
 
   const touchContext = await browser.newContext({
     colorScheme: "dark",
+    reducedMotion: "reduce",
     viewport: { width: 390, height: 844 },
     isMobile: channel !== "firefox",
     hasTouch: true,
@@ -1730,6 +1974,20 @@ try {
     4,
   );
   await assertFixedLight(touchPage, "Tag taps keep the light palette");
+  await touchPage.goto(main);
+  await touchPage.emulateMedia({ reducedMotion: "no-preference" });
+  await touchPage.locator("[data-work-sort]").tap();
+  await observeCardSway(touchPage, "Touch paper sway 390px");
+  await touchPage.emulateMedia({ reducedMotion: "reduce" });
+  assert.equal(await activeSways(touchPage), 0);
+  checks.push(
+    "A mobile tap triggers damped paper sway around a stationary pin and respects a changed motion preference",
+  );
+  await writeFile(
+    path.join(qa, "work-motion-results.json"),
+    JSON.stringify(motionMetrics, null, 2),
+  );
+  await touchPage.goto(`${contentSite}articles/`);
   await touchPage.locator(".brand").tap();
   await touchPage.waitForURL(contentSite);
   assert.equal(await touchPage.locator("a[data-work]").count(), 6);

@@ -27,9 +27,9 @@ const previewStyle = [
   `--preview-top: ${(-preview.crop.y / preview.crop.height) * 100}%`,
 ].join(";");
 ---
-<li data-work-item data-work-tags={JSON.stringify(work.tags)} data-work-published-at={work.publishedAt}>
+<li class:list={["work-item", `tone-${work.tone}`]} data-work-item data-work-tags={JSON.stringify(work.tags)} data-work-published-at={work.publishedAt}>
+  <span class="pin work-pin" aria-hidden="true"></span>
   <article class:list={["work-card", "paper", `tone-${work.tone}`]} data-work-card={work.id}>
-    <span class="pin" aria-hidden="true"></span>
     <div class="work-heading">
       <span class="work-icon">{work.icon.includes("#")
         ? <svg width="40" height="40" aria-hidden="true"><use href={localHref(work.icon)} /></svg>
