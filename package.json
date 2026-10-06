@@ -13,6 +13,7 @@
     "preview": "bun --bun astro preview --host 127.0.0.1",
     "test": "bun scripts/verify-browsers.mjs",
     "demo": "bun scripts/preview-fixtures.mjs",
+    "social-image": "bun scripts/render-social-image.mjs",
     "verify": "bun run typecheck && bun run lint && bun run build && bun run test"
   },
   "dependencies": {

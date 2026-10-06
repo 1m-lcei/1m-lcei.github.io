@@ -35,7 +35,7 @@ const previewStyle = [
         ? <svg width="40" height="40" aria-hidden="true"><use href={localHref(work.icon)} /></svg>
         : <img src={localHref(work.icon)} width="48" height="48" alt="" />}</span>
       <h2 id={`title-${work.id}`}><a class="work-link" href={work.href}
-        aria-labelledby={`title-${work.id}`} aria-describedby={`description-${work.id}`} data-work={work.id}>{work.name}</a></h2>
+        aria-labelledby={`title-${work.id}`} aria-describedby={[`description-${work.id}`, work.note && `note-${work.id}`].filter(Boolean).join(" ")} data-work={work.id}>{work.name}</a></h2>
     </div>
     <div class="work-tags" role="group" aria-label={`${work.name} の分類タグ`}>
       {work.tags.map((tag) => <button type="button" class="work-tag" data-work-tag={tag}
@@ -48,7 +48,10 @@ const previewStyle = [
           alt={preview.alt} loading="lazy" decoding="async" />
       </picture>
     </figure>
-    <p class="work-description" id={`description-${work.id}`}>{work.description}</p>
+    <div class="work-copy">
+      <p class="work-description" id={`description-${work.id}`}>{work.description}</p>
+      {work.note && <p class="work-note" id={`note-${work.id}`}>{work.note}</p>}
+    </div>
     <div class="card-bottom">
       {publicationDate && <p class="work-publication">公開：<time datetime={work.publishedAt}>{publicationDate}</time></p>}
       <Arrow />

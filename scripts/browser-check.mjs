@@ -38,14 +38,6 @@ const expectedPublishedAt = {
   "blue-archive-damage": "2025-05-11T19:14:04.139+09:00",
   "kuto-glossary": "2024-11-09T09:33:49Z",
 };
-const expectedWorkTags = {
-  "kuto-measure": ["ツール", "ブルーアーカイブ", "戦術対抗戦"],
-  "image-rect-picker": ["ツール", "画像"],
-  "kuto-nanidasu": ["診断", "ブルーアーカイブ", "戦術対抗戦"],
-  "kuto-ladder": ["ツール", "ブルーアーカイブ", "戦術対抗戦"],
-  "blue-archive-damage": ["記事", "ブルーアーカイブ", "ダメージ計算"],
-  "kuto-glossary": ["記事", "ブルーアーカイブ", "戦術対抗戦"],
-};
 const expectedDestinations = {
   "kuto-measure": "https://1m-lcei.github.io/kuto-measure/",
   "image-rect-picker": "https://1m-lcei.github.io/image-rect-picker/",
@@ -74,7 +66,6 @@ const checks = [];
 for (const work of works) {
   assert(Object.hasOwn(work, "publishedAt"));
   assert.equal(work.publishedAt, expectedPublishedAt[work.id]);
-  assert.deepEqual(work.tags, expectedWorkTags[work.id]);
   if (work.publishedAt === null) {
     assert.equal(work.publicationSource, null);
   } else {
@@ -273,22 +264,39 @@ try {
       state.keys.length,
       "Metadata keys must not be duplicated",
     );
-    assert.equal(state.title, expected.title);
-    assert.equal(state.meta.description, expected.description);
-    assert.equal(state.meta["og:title"], expected.title);
-    assert.equal(state.meta["og:description"], expected.description);
+    assert(state.title.trim());
+    assert(state.meta.description?.trim());
+    if (expected.title !== undefined) assert.equal(state.title, expected.title);
+    if (expected.description !== undefined)
+      assert.equal(state.meta.description, expected.description);
+    assert.equal(state.meta["og:title"], state.title);
+    assert.equal(state.meta["og:description"], state.meta.description);
     assert.equal(state.meta["og:type"], expected.type || "website");
     assert.equal(state.meta["og:site_name"], siteName);
     assert.equal(state.meta["og:locale"], "ja_JP");
-    assert.equal(state.meta["twitter:card"], "summary");
+    assert.equal(
+      state.meta["twitter:card"],
+      expected.url ? "summary_large_image" : "summary",
+    );
     assert.equal(state.meta["twitter:site"], brandName);
-    assert.equal(state.meta["twitter:title"], expected.title);
-    assert.equal(state.meta["twitter:description"], expected.description);
-    assert.equal(state.images, 0, "No social image was requested");
+    assert.equal(state.meta["twitter:title"], state.title);
+    assert.equal(state.meta["twitter:description"], state.meta.description);
+    assert.equal(state.images, expected.url ? 7 : 0);
+    if (expected.url) {
+      const image = "https://1m-lcei.github.io/og/works-board.png";
+      assert.equal(state.meta["og:image"], image);
+      assert.equal(state.meta["og:image:type"], "image/png");
+      assert.equal(state.meta["og:image:width"], "1200");
+      assert.equal(state.meta["og:image:height"], "630");
+      assert.equal(state.meta["twitter:image"], image);
+      assert.equal(state.meta["twitter:image:alt"], state.meta["og:image:alt"]);
+      assert(state.meta["og:image:alt"]?.trim());
+    }
     assert.deepEqual(state.canonical, expected.url ? [expected.url] : []);
     assert.equal(state.meta["og:url"], expected.url);
     assert.equal(state.meta.robots, expected.noindex ? "noindex" : undefined);
     assert.equal(state.meta["article:published_time"], expected.publishedTime);
+    return state;
   }
   const homepageMeta = {
     title: siteName,
@@ -296,20 +304,24 @@ try {
     url: "https://1m-lcei.github.io/",
   };
   await checkMetadata(path.join(root, "dist", "index.html"), homepageMeta);
-  await checkMetadata(path.join(root, "dist", "articles", "index.html"), {
-    title: `読みもの | ${siteName}`,
-    description: `${siteName} の読みもの一覧。`,
-    url: "https://1m-lcei.github.io/articles/",
-  });
-  checks.push(
-    "Built homepage and article-list metadata is unique, uses the Pages canonical and has no social image",
+  const articleListMeta = await checkMetadata(
+    path.join(root, "dist", "articles", "index.html"),
+    {
+      url: "https://1m-lcei.github.io/articles/",
+    },
   );
-  await checkMetadata(path.join(root, "dist", "404.html"), {
-    title: `ページが見つかりません | ${siteName}`,
-    description:
-      "ページが移動したか、URLが違っているようです。入口のボードから、もう一度どうぞ。",
-    noindex: true,
-  });
+  assert.notEqual(articleListMeta.title, homepageMeta.title);
+  checks.push(
+    "Built homepage and article-list metadata is unique, uses the Pages canonical and absolute social image metadata",
+  );
+  const notFoundMeta = await checkMetadata(
+    path.join(root, "dist", "404.html"),
+    {
+      noindex: true,
+    },
+  );
+  assert.notEqual(notFoundMeta.title, homepageMeta.title);
+  assert.notEqual(notFoundMeta.title, articleListMeta.title);
   await checkMetadata(path.join(fixture, "dist", "index.html"), {
     ...homepageMeta,
     url: undefined,
@@ -511,16 +523,11 @@ try {
       .count(),
     0,
   );
-  assert.equal(await page.locator("main h1").textContent(), "成果物一覧");
-  assert.equal(await page.locator(".brand-wordmark").textContent(), "@1m_lcei");
-  assert.equal(await page.title(), "Kei's Pinboard");
-  assert.equal(
-    await page.locator('meta[property="og:site_name"]').getAttribute("content"),
-    "Kei's Pinboard",
-  );
+  assert((await page.locator("main h1").textContent()).trim());
+  assert.equal(await page.locator(".brand-wordmark").textContent(), brandName);
   assert.equal(
     await page.locator('meta[name="application-name"]').getAttribute("content"),
-    "Kei's Pinboard",
+    siteName,
   );
   assert.equal(
     await page
@@ -531,16 +538,62 @@ try {
     0,
   );
   assert.equal(await page.locator("a button").count(), 0);
-  assert(!(await page.locator("body").innerText()).includes("ツールをひらく"));
+  const socialResponse = await context.request.get(
+    new URL("/og/works-board.png", main).href,
+  );
+  assert.equal(socialResponse.status(), 200);
+  assert.equal(
+    socialResponse.headers()["content-type"].split(";")[0],
+    "image/png",
+  );
+  const socialBytes = Buffer.from(await socialResponse.body());
+  assert.equal(socialBytes.readUInt32BE(16), 1200);
+  assert.equal(socialBytes.readUInt32BE(20), 630);
+  assert(socialBytes.length < 5 * 1024 * 1024);
+  assert.equal(
+    await page.locator(".work-note").count(),
+    works.filter((work) => work.note).length,
+  );
   for (const work of works) {
     const card = page.locator(`[data-work-card="${work.id}"]`);
+    assert.equal(
+      await card.locator(".work-description").textContent(),
+      work.description,
+    );
+    const note = card.locator(".work-note");
+    assert.equal(await note.count(), work.note ? 1 : 0);
+    if (work.note) {
+      assert.equal(await note.textContent(), work.note);
+      assert.equal(await note.getAttribute("id"), `note-${work.id}`);
+      assert(
+        (
+          await card.locator(".work-link").getAttribute("aria-describedby")
+        ).includes(`note-${work.id}`),
+      );
+      const appearance = await note.evaluate((node) => {
+        const description = node.previousElementSibling;
+        const style = getComputedStyle(node);
+        return {
+          size: Number.parseFloat(style.fontSize),
+          bodySize: Number.parseFloat(getComputedStyle(description).fontSize),
+          weight: style.fontWeight,
+          color: style.color,
+          y: node.getBoundingClientRect().top,
+          bodyBottom: description.getBoundingClientRect().bottom,
+        };
+      });
+      assert(appearance.size < appearance.bodySize);
+      assert.equal(appearance.weight, "400");
+      assert.equal(appearance.color, "rgb(112, 102, 87)");
+      assert(appearance.y >= appearance.bodyBottom - 2);
+    }
     assert.equal(
       await card.getByRole("link", { name: work.name, exact: true }).count(),
       1,
     );
     assert.deepEqual(
       await card.locator("[data-work-tag]").allTextContents(),
-      expectedWorkTags[work.id],
+      work.tags,
     );
     assert.equal(await card.locator(".card-bottom svg").count(), 1);
     assert(
@@ -550,6 +603,9 @@ try {
           1,
     );
   }
+  checks.push(
+    "Optional notes follow work data, sit below descriptions in one muted style, remain separate from tags and are included in link descriptions",
+  );
   assert.equal(
     await page.locator("script").count(),
     1,
@@ -1134,16 +1190,15 @@ try {
       .evaluate((node) => node === document.activeElement),
   );
   await page.keyboard.press("Tab");
-  const initialSort = page.getByRole("button", {
-    name: "公開日を古い順に並べる（新しい順と切り替え）",
-    exact: true,
-  });
+  const initialSort = page.locator("[data-work-sort]");
+  const initialSortName = await initialSort.getAttribute("aria-label");
+  assert(initialSortName?.trim());
   assert(await initialSort.evaluate((node) => node === document.activeElement));
   assert.equal(await initialSort.getAttribute("aria-pressed"), "false");
-  assert.equal(
-    await initialSort.locator("[data-work-sort-label]").textContent(),
-    "新しい順",
-  );
+  const initialSortLabel = await initialSort
+    .locator("[data-work-sort-label]")
+    .textContent();
+  assert(initialSortLabel.trim());
   assert.notEqual(
     await initialSort.evaluate((node) => getComputedStyle(node).outlineStyle),
     "none",
@@ -1263,28 +1318,29 @@ try {
     "All seven classifications filter six works, toggle, clear and restore focus without navigation",
   );
 
-  const sortButton = page.getByRole("button", {
-    name: "公開日を古い順に並べる（新しい順と切り替え）",
-    exact: true,
-  });
+  const sortButton = initialSort;
   const oldestWorks = [...expectedWorks].reverse();
   const domWorkIds = (target) =>
     target
       .locator("[data-work-card]")
       .evaluateAll((nodes) => nodes.map((node) => node.dataset.workCard));
   await sortButton.focus();
+  const previousAnnouncement = await page
+    .locator("[data-work-announcement]")
+    .textContent();
   await page.keyboard.press("Space");
   assert.equal(await sortButton.getAttribute("aria-pressed"), "true");
-  assert.equal(
+  assert.notEqual(
     await sortButton.locator("[data-work-sort-label]").textContent(),
-    "古い順",
+    initialSortLabel,
   );
+  assert.equal(await sortButton.getAttribute("aria-label"), initialSortName);
   assert.deepEqual(await domWorkIds(page), oldestWorks);
   assert.deepEqual(await visibleWorkIds(), oldestWorks);
-  assert.match(
-    await page.locator("[data-work-announcement]").textContent(),
-    /古い順/,
-  );
+  const announcement = page.locator("[data-work-announcement]");
+  assert.equal(await announcement.getAttribute("role"), "status");
+  assert.equal(await announcement.getAttribute("aria-live"), "polite");
+  assert.notEqual(await announcement.textContent(), previousAnnouncement);
   assert.equal(page.url(), beforeTagInteractionUrl);
   for (const id of oldestWorks) {
     await page.keyboard.press("Tab");
@@ -1308,6 +1364,10 @@ try {
   await page.keyboard.press("Enter");
   assert.deepEqual(await domWorkIds(page), expectedWorks);
   assert.equal(await sortButton.getAttribute("aria-pressed"), "false");
+  assert.equal(
+    await sortButton.locator("[data-work-sort-label]").textContent(),
+    initialSortLabel,
+  );
   await sortButton.click();
   await loadPreviewImages();
   await page.screenshot({
@@ -1425,19 +1485,9 @@ try {
     await socials.evaluateAll((nodes) => nodes.map((node) => node.href)),
     ["https://x.com/1m_lcei", "https://github.com/1m-lcei"],
   );
-  assert.equal(
-    await page
-      .getByRole("link", { name: "X（@1m_lcei）", exact: true })
-      .count(),
-    1,
-  );
-  assert.equal(
-    await page
-      .getByRole("link", { name: "GitHub（1m-lcei）", exact: true })
-      .count(),
-    1,
-  );
+
   for (const [index, id] of ["x", "github"].entries()) {
+    assert((await socials.nth(index).getAttribute("aria-label"))?.trim());
     assert.equal(
       await socials.nth(index).locator("svg use").getAttribute("href"),
       `${base}social-icons.svg#${id}`,

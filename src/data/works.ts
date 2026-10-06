@@ -21,6 +21,7 @@ export interface Work {
   id: string;
   name: string;
   description: string;
+  note?: string;
   publishedAt: string | null;
   publicationSource: PublicationSource | null;
   tags: WorkTag[];
@@ -47,8 +48,8 @@ export const works: Work[] = [
       basis: "pages-success",
     },
     name: "Kuto Measure (仮)",
-    description:
-      "戦術対抗戦の対戦中画像を下敷きに、距離を図ります（対応シーズン：S11）。",
+    description: "戦術対抗戦の対戦中画像を下敷きに、距離を図ります。",
+    note: "（確認シーズン：S11）",
     tags: ["ツール", "ブルーアーカイブ", "戦術対抗戦"],
     href: "https://1m-lcei.github.io/kuto-measure/",
     icon: "tools/kuto-measure.svg",
@@ -118,7 +119,8 @@ export const works: Work[] = [
       basis: "pages-deploy-completed",
     },
     name: "何出す超会議",
-    description: "戦術対抗戦S9の「何出す」に答えて、タイプ診断できます。",
+    description: "戦術対抗戦の「何出す」に答えて、タイプ診断できます。",
+    note: "（対象シーズン：S9）",
     tags: ["診断", "ブルーアーカイブ", "戦術対抗戦"],
     href: "https://1m-lcei.github.io/kuto-nanidasu/",
     icon: "tools/kuto-nanidasu.svg",
@@ -142,7 +144,8 @@ export const works: Work[] = [
     },
     name: "ブルーアーカイブ ダメージ計算の仕組み",
     description:
-      "ダメージ計算の仕組みを、実際の検証を紹介しつつ整理した本形式の解説です。（申し訳ありませんが、更新は行っていません）",
+      "ダメージ計算の仕組みを、実際の検証を紹介しつつ整理した本形式の解説です。",
+    note: "（申し訳ありませんが、更新は行っていません）",
     tags: ["記事", "ブルーアーカイブ", "ダメージ計算"],
     href: "https://zenn.dev/1m_lcei/books/b380b976c908d9",
     icon: "article-icons.svg#zenn",
@@ -167,7 +170,8 @@ export const works: Work[] = [
     },
     name: "戦術対抗戦トーク 用語・概念集",
     description:
-      "戦術対抗戦で使われる用語や考え方を、いきいきとした例文とともにまとめています。（随時更新は行っていません）",
+      "戦術対抗戦で使われる用語や考え方を、いきいきとした例文とともにまとめています。",
+    note: "（申し訳ありませんが、更新は行っていません）",
     tags: ["記事", "ブルーアーカイブ", "戦術対抗戦"],
     href: "https://gist.github.com/1m-lcei/651ba5bca28fe41011424302b476c770",
     icon: "article-icons.svg#gist",

@@ -1,52 +1,45 @@
 # Kei's Pinboard
 
-4つのWebツールと2つの外部記事を同じカード一覧に置く静的ポータル。Markdown記事の基盤も保持する。Astro・TypeScript・素のCSS・Bunを使用する。表札は `@1m_lcei`、ローカルフォルダ・プロジェクト名は `kei-pinboard`、GitHubリポジトリは `1m-lcei/1m-lcei.github.io`。公開URLは `https://1m-lcei.github.io/`、baseは `/`。
+Webツールと外部記事を共通カード一覧に置く静的ポータル。Markdown記事の基盤も保持する。Astro・TypeScript・素のCSS・Bunを使用し、表札は `@1m_lcei`、ローカル名は `kei-pinboard`。
+
+リポジトリは [1m-lcei/1m-lcei.github.io](https://github.com/1m-lcei/1m-lcei.github.io)、公開先は [https://1m-lcei.github.io/](https://1m-lcei.github.io/)（base `/`）。
 
 ## 開発・検証
 
-Bunは `package.json` の1.4.2、依存は `bun.lock` に固定する。
+Bun・依存は `package.json` / `bun.lock` に合わせる。TypeScriptは `@astrojs/check` のpeer条件に対応する6系を維持する。
 
 ```sh
 bun install --frozen-lockfile
-bun run dev       # http://127.0.0.1:4321/
-bun run verify    # 型・Biome・本番ビルド・ブラウザ/HTML検証
-bun run preview   # ビルドしたdistを確認
-bun run demo      # 4322: 隔離した仮記事のプレビュー
+bun run dev          # http://127.0.0.1:4321/
+bun run verify       # 型・Biome・ビルド・ブラウザ/HTML検証
+bun run preview      # ビルドしたdistを確認
+bun run demo         # 4322: 隔離した仮記事のプレビュー
+bun run social-image # 構図を変更したときにOGPを再生成
 ```
 
-`verify` はWindowsでEdgeとFirefox、LinuxでChromiumとFirefoxを使う。本番ビルドと隔離した検証用HTMLを各ブラウザで再利用する。ビルド後に `bun run test firefox` または `bun run test msedge chromium firefox` でブラウザを指定できる。結果・画像は `.cache/qa/<ブラウザ>/`。共有Playwrightブラウザがない場合だけ `bun node_modules/playwright/cli.js install chromium firefox` で取得する。OSの環境設定は変更しない。
+`verify` はWindowsでEdge/Firefox、LinuxでChromium/Firefoxを使い、仮記事は隔離コピーで検証する。ビルド後は `bun run test firefox` または `bun run test msedge chromium firefox` で指定できる。結果・画像は `.cache/qa/<ブラウザ>/`。Playwrightブラウザがない場合だけ `bun node_modules/playwright/cli.js install chromium firefox` で取得する。
 
-TypeScriptは6.0.3を保持する。正式な `typescript` 7.0.2は存在するが、最新の [`@astrojs/check` 0.9.10](https://github.com/withastro/astro/blob/main/packages/language-tools/astro-check/package.json) のpeer条件は5または6で、7への更新はその対応後に行う。
-
-## 編集する場所
+## 編集
 
 | 場所 | 用途 |
 | --- | --- |
-| `src/data/works.ts` | 成果物の名前・文面・公開日時と出典・リンク・タグ・画像の表示範囲 |
-| `src/styles/global.css` | 配色・フォント・レイアウト |
-| `src/layouts/SiteLayout.astro` | 共通表示とHTMLメタデータ |
+| `src/data/works.ts` | 名前・説明・任意の注記 `note`・リンク・タグ・公開日時と出典・画像範囲 |
+| `src/styles/global.css` / `src/layouts/SiteLayout.astro` | 見た目・共通表示・メタデータ |
 | `src/lib/site.ts` / `astro.config.mjs` | サイト名・説明・公開先・base |
-| `src/content/posts/` / `templates/article.md` | 記事とひな形 |
-| `public/tools/` / `public/tools/screenshots/` | ツールアイコン・PNG/AVIF（外部記事は `public/articles/`） |
-| `src/assets/textures/` / `assets/` | 紙・コルクの素材と出典 |
-| `scripts/` | ブラウザ検証と隔離プレビュー |
+| `src/content/posts/` / `templates/article.md` | Markdown記事とひな形 |
+| `public/tools/` / `public/articles/` / `src/assets/textures/` | アイコン・PNG/AVIF・紙とコルク（出典は `assets/`） |
+| `assets/social-preview/board.html` / `public/og/works-board.png` | OGP構図と1200×630の共有画像 |
 
-成果物は確認済みの公開日時の新しい順で初期表示し、一覧上のテープ留め紙札で古い順と切り替えられる。同時刻は定義順、不明日時は `null` として末尾を保つ。タグで絞り込んだ状態でも順を切り替えられ、解除後も選んだ順序を保つ。DOM順も表示と一致し、キーボードや読み上げはその順に従う。並び順は永続保存しない。根拠・精度と確認待ちは [公開日時の記録](assets/publication-sources.md) を参照。
+作品は公開日時の新しい順を初期表示し、古い順への切替と単一タグ絞込を併用できる。同時刻は定義順、不明日時は末尾。注記は説明文の下に表示する。[公開日時の出典](assets/publication-sources.md)を参照。
 
-タグ絞込・解除と並び順切替の際に、ピンを固定したまま紙だけが左右交互の小さな傾きからゆっくり揺り戻し、約1秒で収まる。切替直後から開始角を付け、中央から振り出す姿勢が一瞬見えるのを避ける。初期表示では動かさず、連続操作は最後の状態に集約する。動きを減らす設定では再生しない。CSS keyframesと既存の少量JSだけで実装し、新しい依存は追加していない。
+記事は `title`・`description`・`date` が必須、`tags` は任意。公開するものだけ `draft: false` にし、`/articles/` に掲載する。下書きと仮記事は本番に含めない。
 
-記事の必須項目は `title`、`description`、`date`。公開するものだけ `draft: false` にし、`tags` は任意。下書きと仮記事は本番に含めない。記事は `/articles/` に並び、トップはツールと外部記事を同じ一覧に表示する。既存4ツールのリポジトリは変更しない。
-
-メタデータはページ別title/description・canonical・OGP・画像なしのX summary。記事は `article` と公開日、404と仮記事プレビューは `noindex` とし、公開URLのcanonicalを付けない。OGP画像は用意しない。
+OGPは実画面3枚の作品ボードで、サイト名やコピーを画像に入れない。共有画像をOGPに指定し、Xは `summary_large_image` を使う。404と仮記事プレビューは `noindex` とし、canonicalと共有画像を付けない。
 
 ## CI/CD
 
-`.github/workflows/pages.yml` はPRと `main` pushで固定依存のインストール、型/整形/lint、ビルド、Chromium・Firefox検証を行う。PRは検証のみ。`main` pushの検証成功後だけ、同じ `dist/` をPages artifactとして公開する。検証用のコピー・画像・ソースは公開しない。
+`.github/workflows/pages.yml` はPRと `main` pushで固定依存・型・Biome・ビルド・Chromium/Firefox検証を実行する。PRは検証のみ、`main` は成功した同じ `dist/` を公開する。検証用コピー・画像・ソースは公開しない。
 
-GitHubリポジトリは [`1m-lcei/1m-lcei.github.io`](https://github.com/1m-lcei/1m-lcei.github.io)。ユーザーサイトとして [`https://1m-lcei.github.io/`](https://1m-lcei.github.io/) に公開する。ローカルフォルダとサイト名は変更しない。旧 `/kei-pinboard/` に互換ページや誘導は置かない。
+`origin` は `https://github.com/1m-lcei/1m-lcei.github.io.git`。PagesのSourceは **GitHub Actions**、`github-pages` 環境にブランチ制限がある場合は `main` を許可する。旧 `/kei-pinboard/` への互換ページは置かない。
 
-1. **Settings → Pages → Build and deployment → Source** は **GitHub Actions**。
-2. `github-pages` 環境でブランチ制限を設定する場合は `main` を許可する。
-3. `origin` は `https://github.com/1m-lcei/1m-lcei.github.io.git`。
-
-公開設定とデプロイは対象作業への明示的な許可の範囲で行う。[GitHub Pages公式手順](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages)を参照。通常push後に、同じコミットのCI成功と公開URLのHTML・画像・リンクを確認する。
+公開操作には対象作業への明示的な許可が必要。push後は同一コミットのCI成功と公開HTML・画像・リンクを確認する。[GitHub Pages公式手順](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages)を参照。
