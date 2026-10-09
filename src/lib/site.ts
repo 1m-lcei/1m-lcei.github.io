@@ -1,6 +1,6 @@
-export const siteName = "Kei's Pinboard";
+export const siteName = "kei（けー）のピンボード";
 export const brandName = "@1m_lcei";
-export const siteDescription = "keiのツールや文章置き場。";
+export const siteDescription = "出したもの置き場。";
 
 export function localHref(path = ""): string {
   const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
