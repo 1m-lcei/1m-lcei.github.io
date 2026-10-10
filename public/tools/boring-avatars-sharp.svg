@@ -1,0 +1,26 @@
+<!--
+Gallery sample: https://github.com/1m-lcei/BoringAvatarsSharp/blob/main/sandbox/output/beam-1.svg
+BoringAvatarsSharp v0.1.0 — SVG styles adapted from https://github.com/boringdesigners/boring-avatars
+MIT License
+Copyright (c) 2026 1m-lcei
+Copyright (c) 2021 boringdesigners
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36" width="88" height="88" role="img" aria-label="Ada Lovelace"><title>Ada Lovelace</title><defs><clipPath id="c"><rect width="36" height="36" rx="18"/></clipPath></defs><g clip-path="url(#c)"><rect width="36" height="36" fill="#146A7C"/><rect width="36" height="36" fill="#C20D90" rx="36" transform="translate(3 2) rotate(148 18 18) scale(1)"/><g transform="translate(1 1) rotate(-7 18 18)"><path d="M15 20c2 1 4 1 6 0" fill="none" stroke="#FFFFFF" stroke-linecap="round"/><rect x="13" y="14" width="1.5" height="2" rx="1" fill="#FFFFFF"/><rect x="21" y="14" width="1.5" height="2" rx="1" fill="#FFFFFF"/></g></g></svg>

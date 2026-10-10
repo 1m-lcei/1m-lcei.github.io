@@ -525,6 +525,7 @@
   }
   .work-sort-symbol {
     font-size: 1.15em;
+    pointer-events: none;
   }
   .work-sort .work-sort-tape {
     inset-block-start: -0.35rem;
@@ -539,9 +540,6 @@
   .work-sort:active {
     transform: translateY(1px);
     filter: drop-shadow(0 1px 1px #543b2528);
-  }
-  .work-sort[aria-pressed="true"] {
-    rotate: -0.6deg;
   }
   .work-filter-status {
     display: flex;
@@ -569,14 +567,39 @@
     text-decoration: underline;
     cursor: pointer;
   }
+  .work-recommendation {
+    --recommendation-size: 2.75rem;
+    position: absolute;
+    inset-block-start: 0.65rem;
+    inset-inline-end: 0.75rem;
+    inline-size: var(--recommendation-size);
+    block-size: var(--recommendation-size);
+    z-index: 0;
+    color: #c55135;
+    opacity: 0.24;
+    rotate: -4deg;
+    pointer-events: none;
+  }
+  .work-recommendation svg {
+    inline-size: 100%;
+    block-size: 100%;
+  }
   .work-heading {
     display: flex;
     align-items: center;
     gap: 1rem;
     margin-block-end: 0.2rem;
   }
-  .work-heading > h2 {
+  .work-title {
+    display: flex;
+    flex: 1;
+    align-items: center;
     min-inline-size: 0;
+  }
+  .work-title > h2 {
+    flex: 1;
+    min-inline-size: 0;
+    z-index: 1;
   }
   .work-link {
     text-decoration: none;

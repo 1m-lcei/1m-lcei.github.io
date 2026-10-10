@@ -1,10 +1,11 @@
 for (const root of document.querySelectorAll("[data-work-filter]")) {
   const items = Array.from(
     root.querySelectorAll("[data-work-item]"),
-    (node, index) => ({
+    (node) => ({
       node,
       card: node.querySelector("[data-work-card]"),
-      index,
+      index: Number(node.dataset.workIndex),
+      recommended: node.dataset.workRecommended === "true",
       tags: JSON.parse(node.dataset.workTags),
       timestamp: node.dataset.workPublishedAt
         ? Date.parse(node.dataset.workPublishedAt)
@@ -19,15 +20,31 @@ for (const root of document.querySelectorAll("[data-work-filter]")) {
   const list = root.querySelector("#work-list");
   const controls = root.querySelector("[data-work-controls]");
   const sort = root.querySelector("[data-work-sort]");
-  const sortLabel = root.querySelector("[data-work-sort-label]");
-  const oldestItems = [...items].sort((left, right) => {
-    if (left.timestamp === null) {
-      return right.timestamp === null ? left.index - right.index : 1;
-    }
-    if (right.timestamp === null) return -1;
-    return left.timestamp - right.timestamp || left.index - right.index;
-  });
-  let oldest = false;
+  const sortLabel = sort.querySelector("[data-work-sort-label]");
+  const sortLabels = JSON.parse(sort.dataset.workSortLabels);
+  const orderModes = ["recommended", "newest", "oldest"];
+  let orderIndex = 0;
+  function byPublication(direction) {
+    return (left, right) => {
+      if (left.timestamp === null) {
+        return right.timestamp === null ? left.index - right.index : 1;
+      }
+      if (right.timestamp === null) return -1;
+      return (
+        direction * (left.timestamp - right.timestamp) ||
+        left.index - right.index
+      );
+    };
+  }
+  const newestItems = [...items].sort(byPublication(-1));
+  const orders = {
+    recommended: [
+      ...newestItems.filter((item) => item.recommended),
+      ...newestItems.filter((item) => !item.recommended),
+    ],
+    newest: newestItems,
+    oldest: [...items].sort(byPublication(1)),
+  };
   let selected = "";
   let trigger;
   let swingFrame = 0;
@@ -59,7 +76,9 @@ for (const root of document.querySelectorAll("[data-work-filter]")) {
       }
     });
   }
-  reducedMotion.addEventListener("change", resetSwing);
+  reducedMotion.addEventListener("change", () => {
+    if (reducedMotion.matches) resetSwing();
+  });
 
   function select(tag) {
     selected = tag;
@@ -76,7 +95,7 @@ for (const root of document.querySelectorAll("[data-work-filter]")) {
     }
     const message = tag ? `「${tag}」 ${count}件` : `すべての成果物 ${count}件`;
     label.textContent = message;
-    announcement.textContent = `${message}、${oldest ? "古い順" : "新しい順"}`;
+    announcement.textContent = `${message}、${sortLabel.textContent}`;
     status.hidden = !tag;
     if (
       items.some(
@@ -90,11 +109,14 @@ for (const root of document.querySelectorAll("[data-work-filter]")) {
 
   controls.hidden = false;
   sort.disabled = false;
+  sort.dataset.workSortOrder = orderModes[orderIndex];
+  sortLabel.textContent = sortLabels[orderModes[orderIndex]];
   sort.addEventListener("click", () => {
-    oldest = !oldest;
-    list.append(...(oldest ? oldestItems : items).map(({ node }) => node));
-    sort.setAttribute("aria-pressed", String(oldest));
-    sortLabel.textContent = oldest ? "古い順" : "新しい順";
+    orderIndex = (orderIndex + 1) % orderModes.length;
+    const mode = orderModes[orderIndex];
+    sort.dataset.workSortOrder = mode;
+    sortLabel.textContent = sortLabels[mode];
+    list.append(...orders[mode].map(({ node }) => node));
     select(selected);
   });
 

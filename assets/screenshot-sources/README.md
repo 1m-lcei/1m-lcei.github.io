@@ -1,9 +1,10 @@
 # Work screenshots
 
-The user supplied exactly these four BMP files. ImageMagick 7.1.2-30 converted them to full-size PNG and AVIF without resizing or cropping. Original BMPs remain untouched in the user's specified folder. Served assets are in `public/tools/screenshots/`; ordinary `picture`/`source`/`img` elements retain the requested formats without Astro image transformation.
+The user supplied these BMP files. ImageMagick 7.1.2-30 converted them to full-size PNG and AVIF without resizing or cropping. Original BMPs remain untouched in the user's specified folder. Served assets are in `public/tools/screenshots/`; ordinary `picture`/`source`/`img` elements retain the requested formats without Astro image transformation.
 
 | Tool | Full size | PNG bytes | AVIF bytes | Visible region in source pixels: x, y, width, height |
 | --- | --- | ---: | ---: | --- |
+| BoringAvatarsSharp | 636 × 700 | 79038 | 20250 | 0, 50, 636, 318 |
 | kuto-measure | 1390 × 873 | 730561 | 96649 | 170, 260, 670, 335 |
 | image-rect-picker | 1105 × 895 | 346960 | 55835 | 25, 350, 760, 380 |
 | kuto-ladder | 996 × 911 | 53772 | 12620 | 250, 230, 560, 315 |
@@ -24,6 +25,8 @@ The user authorized reuse of the actual cover and catch artwork from the origina
 
 The original Zenn JPEG is converted to a full-size PNG; the Gist PNG is copied byte-for-byte. AVIF conversions retain each original size. Served paths remain `public/articles/screenshots/*.png` and `*.avif`. The common `WorkCard` uses AVIF first and PNG fallback. Service icon sources and published use guidance are recorded in [brand-sources](../brand-sources/README.md).
 
-All six image frames use the same 2:1 aspect ratio. Each existing source crop is proportionally fitted and centered inside that frame, so the four tool compositions and the full Gist catch are retained. The original PNG/AVIF bytes remain unchanged.
+All image frames use the same 2:1 aspect ratio. Each existing source crop is proportionally fitted and centered inside that frame, so the four tool compositions and the full Gist catch are retained. The original PNG/AVIF bytes remain unchanged.
 
 The full-cover contain option was reviewed first at 1440px, 390px and 320px. Its title was too small at 320px. With the user's approval to crop vertically, the final CSS crop retains the complete book title panel and bottom artwork while omitting the upper circle. The original 500 × 700 PNG/AVIF files remain intact.
+
+BoringAvatarsSharp was added on 2026-10-10 from the user-specified `boring-avatars-sharp.bmp` screenshot. Its full 636 × 700 image is retained; the reversible viewport shows the complete Marble, Beam and Pixel rows in the same 2:1 frame. The card icon is an independent copy of the gallery's default Beam sample (Ada Lovelace), not an official project logo. Original paths are unchanged; the generator's own and upstream MIT notices are included in the SVG comment.

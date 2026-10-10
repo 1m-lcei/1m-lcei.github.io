@@ -2,6 +2,8 @@ export type WorkTag =
   | "ツール"
   | "診断"
   | "画像"
+  | "ライブラリ"
+  | "C♯"
   | "戦術対抗戦"
   | "記事"
   | "ブルーアーカイブ"
@@ -22,6 +24,7 @@ export interface Work {
   name: string;
   description: string;
   note?: string;
+  recommended?: boolean;
   publishedAt: string | null;
   publicationSource: PublicationSource | null;
   tags: WorkTag[];
@@ -40,7 +43,32 @@ export interface Work {
 
 export const works: Work[] = [
   {
+    id: "boring-avatars-sharp",
+    publishedAt: "2026-10-10T01:20:16Z",
+    publicationSource: {
+      url: "https://api.github.com/repos/1m-lcei/BoringAvatarsSharp/deployments/6974312039/statuses",
+      precision: "second",
+      basis: "pages-success",
+    },
+    name: "BoringAvatarsSharp",
+    description:
+      "boring-avatars を基にした、SVGアバター生成C#ライブラリです（完全移植ではありません）。リンク先はギャラリーサイトです。",
+    tags: ["ライブラリ", "C♯", "画像"],
+    href: "https://1m-lcei.github.io/BoringAvatarsSharp/sandbox/output/",
+    icon: "tools/boring-avatars-sharp.svg",
+    preview: {
+      png: "tools/screenshots/boring-avatars-sharp.png",
+      avif: "tools/screenshots/boring-avatars-sharp.avif",
+      width: 636,
+      height: 700,
+      alt: "Marble・Beam・PixelのSVGアバターが、それぞれ3列並ぶギャラリー画面",
+      crop: { x: 0, y: 50, width: 636, height: 318 },
+    },
+    tone: "rose",
+  },
+  {
     id: "kuto-measure",
+    recommended: true,
     publishedAt: "2026-09-26T11:06:47Z",
     publicationSource: {
       url: "https://api.github.com/repos/1m-lcei/kuto-measure/deployments/6678046805/statuses",
@@ -89,6 +117,7 @@ export const works: Work[] = [
   },
   {
     id: "kuto-ladder",
+    recommended: true,
     publishedAt: "2025-10-02T11:26:07Z",
     publicationSource: {
       url: "https://github.com/1m-lcei/kuto-ladder/actions/runs/18191601970/job/51787718394",
@@ -136,6 +165,7 @@ export const works: Work[] = [
   },
   {
     id: "blue-archive-damage",
+    recommended: true,
     publishedAt: "2025-05-11T19:14:04.139+09:00",
     publicationSource: {
       url: "https://zenn.dev/1m_lcei/books/b380b976c908d9",
@@ -161,6 +191,7 @@ export const works: Work[] = [
   },
   {
     id: "kuto-glossary",
+    recommended: true,
     // The user approved adopting this official creation time as publication time.
     publishedAt: "2024-11-09T09:33:49Z",
     publicationSource: {
@@ -208,4 +239,18 @@ export function sortWorksByPublishedAt<
       return right.timestamp - left.timestamp || left.index - right.index;
     })
     .map(({ work }) => work);
+}
+
+/** Recommended works lead; each group retains newest-first publication order. */
+export function sortRecommendedWorks<
+  T extends {
+    publishedAt: string | null;
+    recommended?: boolean;
+  },
+>(items: readonly T[]): T[] {
+  const newest = sortWorksByPublishedAt(items);
+  return [
+    ...newest.filter((work) => work.recommended),
+    ...newest.filter((work) => !work.recommended),
+  ];
 }

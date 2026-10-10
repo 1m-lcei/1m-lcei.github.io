@@ -1,11 +1,16 @@
 ---
-import { type Work, sortWorksByPublishedAt } from "../data/works";
+import { type Work, sortRecommendedWorks } from "../data/works";
 import filterScript from "../scripts/work-filter.js?raw";
 import WorkCard from "./WorkCard.astro";
 
 interface Props { works: Work[] }
 const { works } = Astro.props;
-const orderedWorks = sortWorksByPublishedAt(works);
+const orderedWorks = sortRecommendedWorks(works);
+const orderLabels = {
+  recommended: "おすすめ順",
+  newest: "新しい順",
+  oldest: "古い順",
+};
 ---
 <div data-work-filter>
   <p class="visually-hidden" role="status" aria-live="polite" data-work-announcement></p>
@@ -14,15 +19,16 @@ const orderedWorks = sortWorksByPublishedAt(works);
       <span data-work-filter-label></span>
       <button type="button" class="work-filter-clear" aria-label="成果物の絞り込みを解除" data-clear-work-filter>解除</button>
     </div>
-    <button type="button" class="work-sort paper" data-work-sort disabled
-      aria-label="公開日を古い順に並べる（新しい順と切り替え）" aria-pressed="false" aria-controls="work-list" aria-describedby="work-sort-hint">
+    <button type="button" class="work-sort paper" data-work-sort data-work-sort-order="recommended" data-work-sort-labels={JSON.stringify(orderLabels)} disabled aria-controls="work-list" aria-describedby="work-sort-hint">
       <span class="tape work-sort-tape" aria-hidden="true"></span>
-      <span data-work-sort-label>新しい順</span><span class="work-sort-symbol" aria-hidden="true">⇅</span>
+      <span class="visually-hidden">並び順：</span>
+      <span data-work-sort-label>{orderLabels.recommended}</span>
+      <span class="work-sort-symbol" aria-hidden="true">⇅</span>
     </button>
-    <p class="visually-hidden" id="work-sort-hint">押すと新しい順と古い順を切り替えます。オンのときは古い順、オフのときは新しい順です。</p>
+    <p class="visually-hidden" id="work-sort-hint">押すたびにおすすめ順、新しい順、古い順の順で切り替わります。</p>
   </div>
   <ul id="work-list" class="work-grid" role="list">
-    {orderedWorks.map((work) => <WorkCard work={work} />)}
+    {orderedWorks.map((work) => <WorkCard work={work} order={works.indexOf(work)} />)}
   </ul>
 </div>
 <script is:inline data-work-filter-script set:html={filterScript}></script>

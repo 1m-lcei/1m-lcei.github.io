@@ -5,7 +5,11 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import AxeBuilder from "@axe-core/playwright";
 import { chromium, firefox } from "playwright";
-import { sortWorksByPublishedAt, works } from "../src/data/works.ts";
+import {
+  sortRecommendedWorks,
+  sortWorksByPublishedAt,
+  works,
+} from "../src/data/works.ts";
 import { brandName, siteDescription, siteName } from "../src/lib/site.ts";
 import { createPreviewFixture } from "./preview-content.mjs";
 
@@ -24,13 +28,63 @@ const qa = path.join(qaRoot, channel);
 const base = "/";
 const expectedWorks = [
   "kuto-measure",
+  "kuto-ladder",
+  "blue-archive-damage",
+  "kuto-glossary",
+  "boring-avatars-sharp",
+  "image-rect-picker",
+  "kuto-nanidasu",
+];
+const newestWorks = [
+  "boring-avatars-sharp",
+  "kuto-measure",
   "image-rect-picker",
   "kuto-nanidasu",
   "kuto-ladder",
   "blue-archive-damage",
   "kuto-glossary",
 ];
+const oldestWorks = [...newestWorks].reverse();
+const expectedRecommended = [
+  "kuto-measure",
+  "kuto-ladder",
+  "blue-archive-damage",
+  "kuto-glossary",
+];
+const expectedOrders = {
+  recommended: expectedWorks,
+  newest: newestWorks,
+  oldest: oldestWorks,
+};
+const orderModes = ["recommended", "newest", "oldest"];
+async function assertWorkOrder(target, mode) {
+  const button = target.locator("[data-work-sort]");
+  assert.equal(await button.getAttribute("data-work-sort-order"), mode);
+  const labels = JSON.parse(await button.getAttribute("data-work-sort-labels"));
+  assert.equal(
+    await button.locator("[data-work-sort-label]").textContent(),
+    labels[mode],
+  );
+}
+async function setWorkOrder(target, mode, activation = "click") {
+  assert(orderModes.includes(mode));
+  const button = target.locator("[data-work-sort]");
+  for (let step = 0; step < orderModes.length; step++) {
+    const current = await button.getAttribute("data-work-sort-order");
+    assert(orderModes.includes(current));
+    if (current === mode) {
+      await assertWorkOrder(target, mode);
+      return;
+    }
+    const next =
+      orderModes[(orderModes.indexOf(current) + 1) % orderModes.length];
+    await button[activation]();
+    await assertWorkOrder(target, next);
+  }
+  assert.fail(`Cannot cycle to order: ${mode}`);
+}
 const expectedPublishedAt = {
+  "boring-avatars-sharp": "2026-10-10T01:20:16Z",
   "kuto-measure": "2026-09-26T11:06:47Z",
   "image-rect-picker": "2026-09-23T15:05:57Z",
   "kuto-nanidasu": "2025-10-10T10:39:51Z",
@@ -39,6 +93,8 @@ const expectedPublishedAt = {
   "kuto-glossary": "2024-11-09T09:33:49Z",
 };
 const expectedDestinations = {
+  "boring-avatars-sharp":
+    "https://1m-lcei.github.io/BoringAvatarsSharp/sandbox/output/",
   "kuto-measure": "https://1m-lcei.github.io/kuto-measure/",
   "image-rect-picker": "https://1m-lcei.github.io/image-rect-picker/",
   "kuto-ladder": "https://1m-lcei.github.io/kuto-ladder/",
@@ -48,16 +104,18 @@ const expectedDestinations = {
     "https://gist.github.com/1m-lcei/651ba5bca28fe41011424302b476c770",
 };
 const expectedTagMatches = {
-  ツール: ["kuto-measure", "image-rect-picker", "kuto-ladder"],
+  ツール: ["kuto-measure", "kuto-ladder", "image-rect-picker"],
   診断: ["kuto-nanidasu"],
-  画像: ["image-rect-picker"],
-  戦術対抗戦: ["kuto-measure", "kuto-nanidasu", "kuto-ladder", "kuto-glossary"],
+  画像: ["boring-avatars-sharp", "image-rect-picker"],
+  ライブラリ: ["boring-avatars-sharp"],
+  "C♯": ["boring-avatars-sharp"],
+  戦術対抗戦: ["kuto-measure", "kuto-ladder", "kuto-glossary", "kuto-nanidasu"],
   ブルーアーカイブ: [
     "kuto-measure",
-    "kuto-nanidasu",
     "kuto-ladder",
     "blue-archive-damage",
     "kuto-glossary",
+    "kuto-nanidasu",
   ],
   記事: ["blue-archive-damage", "kuto-glossary"],
   ダメージ計算: ["blue-archive-damage"],
@@ -81,7 +139,19 @@ for (const work of works) {
 }
 assert.deepEqual(
   sortWorksByPublishedAt(works).map((work) => work.id),
+  newestWorks,
+);
+assert.deepEqual(
+  sortRecommendedWorks(works).map((work) => work.id),
   expectedWorks,
+);
+assert.deepEqual(
+  works.filter((work) => work.recommended).map((work) => work.id),
+  expectedRecommended,
+);
+assert.deepEqual(
+  works.find((work) => work.id === "boring-avatars-sharp").tags,
+  ["ライブラリ", "C♯", "画像"],
 );
 const stableFixture = Object.freeze([
   { id: "unknown-first", publishedAt: null },
@@ -90,12 +160,14 @@ const stableFixture = Object.freeze([
   { id: "equal-utc-second", publishedAt: "2025-05-11T00:00:00Z" },
   { id: "older", publishedAt: "2024-11-09T09:33:49Z" },
   { id: "unknown-second", publishedAt: null },
+  { id: "between-equals", publishedAt: "2025-05-11T00:00:00.001Z" },
 ]);
 const stableBefore = structuredClone(stableFixture);
 assert.deepEqual(
   sortWorksByPublishedAt(stableFixture).map((work) => work.id),
   [
     "same-day-newer",
+    "between-equals",
     "equal-jst-first",
     "equal-utc-second",
     "older",
@@ -490,7 +562,7 @@ try {
   checks.push(
     "Cork and paper textures load as local WebP assets under the Pages base",
   );
-  assert.equal(await page.locator("a[data-work]").count(), 6);
+  assert.equal(await page.locator("a[data-work]").count(), works.length);
   assert.deepEqual(
     await page
       .locator("a[data-work]")
@@ -507,7 +579,7 @@ try {
     );
   }
   checks.push(
-    "Built HTML renders all six works in verified publication order with the oldest Gist last",
+    "Built HTML renders all seven works with recommendations first, then verified publication order including the recommended glossary",
   );
   for (const id of expectedWorks) {
     assert.equal(
@@ -684,6 +756,142 @@ try {
   checks.push(
     "Article icons use local SVG symbols with the unchanged blue Zenn logo and black Octicons code paths",
   );
+  const flowerResponse = await context.request.get(
+    new URL(`${base}hanamaru.svg`, main).href,
+  );
+  assert.equal(flowerResponse.status(), 200);
+  assert.match(flowerResponse.headers()["content-type"], /image\/svg\+xml/);
+  assert.equal(
+    await flowerResponse.text(),
+    await readFile(path.join(root, "public/hanamaru.svg"), "utf8"),
+  );
+  async function verifyRecommendations(label) {
+    await page.waitForFunction(() =>
+      Array.from(document.querySelectorAll(".work-recommendation use")).every(
+        (node) => node.getBBox().width > 0,
+      ),
+    );
+    assert.deepEqual(
+      await page
+        .locator("[data-work-recommended]")
+        .evaluateAll((nodes) =>
+          nodes.map(
+            (node) => node.querySelector("[data-work-card]").dataset.workCard,
+          ),
+        ),
+      expectedRecommended,
+    );
+    for (const id of expectedRecommended) {
+      const card = page.locator(`[data-work-card="${id}"]`);
+      const badge = card.locator(".work-recommendation");
+      assert((await badge.textContent()).trim());
+      assert(
+        (await card.locator("a").getAttribute("aria-describedby")).includes(
+          await badge.getAttribute("id"),
+        ),
+      );
+      assert.equal(
+        await badge.locator("svg").getAttribute("aria-hidden"),
+        "true",
+      );
+      const markUse = badge.locator("svg use");
+      assert.equal(await markUse.count(), 1);
+      assert.equal(
+        await markUse.getAttribute("href"),
+        `${base}hanamaru.svg#hanamaru`,
+      );
+      const drawing = await markUse.evaluate((node) => {
+        const box = node.getBBox();
+        return { width: box.width, height: box.height };
+      });
+      assert(
+        drawing.width > 0 && drawing.height > 0,
+        "The external flower symbol renders",
+      );
+      const placement = await badge.evaluate((mark) => ({
+        position: getComputedStyle(mark).position,
+        anchorCard: mark.offsetParent === mark.closest("[data-work-card]"),
+      }));
+      assert.equal(placement.position, "absolute");
+      assert(
+        placement.anchorCard,
+        `${label}: flower must be anchored to its paper card`,
+      );
+      const layers = await card.evaluate((node) => ({
+        title: Number(getComputedStyle(node.querySelector("h2")).zIndex),
+        flower: Number(
+          getComputedStyle(node.querySelector(".work-recommendation")).zIndex,
+        ),
+      }));
+      assert(
+        layers.title > layers.flower,
+        "Title text must paint above its flower",
+      );
+      const layout = await card.evaluate((node) => {
+        const mark = node.querySelector(".work-recommendation");
+        const title = node.querySelector("h2");
+        const dimensions = () => ({
+          titleHeight: title.offsetHeight,
+          titleWidth: title.offsetWidth,
+          availableTitleWidth: node.querySelector(".work-title").offsetWidth,
+          titleRowHeight: node.querySelector(".work-title").offsetHeight,
+          headingHeight: node.querySelector(".work-heading").offsetHeight,
+          cardHeight: node.offsetHeight,
+          tagsTop: node.querySelector(".work-tags").offsetTop,
+        });
+        const visible = dimensions();
+        const previous = mark.getAttribute("style");
+        mark.style.display = "none";
+        const hidden = dimensions();
+        if (previous === null) mark.removeAttribute("style");
+        else mark.setAttribute("style", previous);
+        return { visible, hidden };
+      });
+      assert.equal(
+        layout.visible.titleWidth,
+        layout.visible.availableTitleWidth,
+        `${label}: flower must not reserve title width`,
+      );
+      assert.deepEqual(
+        layout.visible,
+        layout.hidden,
+        `${label}: flower must not set title or card dimensions or change title wrapping`,
+      );
+      assert.equal(
+        await badge.evaluate((node) => getComputedStyle(node).pointerEvents),
+        "none",
+      );
+      const bounds = await badge.locator("svg").boundingBox();
+      const outer = await card.boundingBox();
+      assert(
+        bounds.x >= outer.x + outer.width / 2,
+        `${label}: badge must occupy the upper right`,
+      );
+      assert(bounds.y <= outer.y + outer.height / 4);
+      for (const part of [
+        card.locator(".work-tags"),
+        card.locator(".work-preview"),
+        card.locator("..").locator(".work-pin"),
+      ]) {
+        const other = await part.boundingBox();
+        assert(
+          bounds.x + bounds.width <= other.x ||
+            other.x + other.width <= bounds.x ||
+            bounds.y + bounds.height <= other.y ||
+            other.y + other.height <= bounds.y,
+          `${label}: badge overlaps content`,
+        );
+      }
+    }
+    assert.equal(
+      await page.locator(".work-recommendation").count(),
+      expectedRecommended.length,
+    );
+  }
+  await verifyRecommendations("Desktop");
+  checks.push(
+    "Recommended tools and articles use the shared flower SVG, sit at each paper's upper right without reserving title width or setting row height, paint below title text, preserve accessible descriptions and avoid tag/pin/preview overlap",
+  );
   const frameMetrics = [];
   async function verifyImageFrames(label, target = page) {
     const metrics = await target
@@ -707,11 +915,11 @@ try {
           };
         }),
       );
-    assert.equal(metrics.length, 6);
+    assert.equal(metrics.length, works.length);
     const heights = metrics.map((metric) => metric.frameHeight);
     assert(
       Math.max(...heights) - Math.min(...heights) < 0.1,
-      `All six image frames must have equal CSS heights at ${label}`,
+      `All seven image frames must have equal CSS heights at ${label}`,
     );
     for (const metric of metrics) {
       const preview = works.find((work) => work.id === metric.id).preview;
@@ -761,7 +969,7 @@ try {
   );
   await verifyImageFrames("desktop");
   checks.push(
-    "All six image frames have equal heights, preserve proportional source crops, and retain the complete book title panel",
+    "All seven image frames have equal heights, preserve proportional source crops, and retain the complete book title panel",
   );
   const imageMetrics = [];
   for (const work of works) {
@@ -821,7 +1029,7 @@ try {
     JSON.stringify(imageMetrics, null, 2),
   );
   checks.push(
-    "All six pictures select AVIF, reserve dimensions, retain exact PNG/AVIF bytes and avoid source-pixel enlargement",
+    "All seven pictures select AVIF, reserve dimensions, retain exact PNG/AVIF bytes and avoid source-pixel enlargement",
   );
   await noOverflow("Desktop");
   await audit("Desktop homepage");
@@ -885,7 +1093,7 @@ try {
   });
   await fallbackContext.close();
   checks.push(
-    "All six native picture fallbacks select and decode PNG when AVIF MIME support is unavailable",
+    "All seven native picture fallbacks select and decode PNG when AVIF MIME support is unavailable",
   );
   const firstCard = await page.locator(".work-card").first().boundingBox();
   await page.screenshot({
@@ -1052,7 +1260,10 @@ try {
   );
   assert.equal(await page.locator(".work-swing-start").count(), 0);
   assert.equal(await page.locator(".work-card > .pin").count(), 0);
-  assert.equal(await page.locator("[data-work-item] > .work-pin").count(), 6);
+  assert.equal(
+    await page.locator("[data-work-item] > .work-pin").count(),
+    works.length,
+  );
   checks.push(
     "Initial load has no sway; each pin is a stationary sibling of its paper card",
   );
@@ -1060,7 +1271,8 @@ try {
     await page.setViewportSize({ width, height: 1000 });
     await page.goto(main);
     const startAngles = await page.evaluate(() => {
-      document.querySelector("[data-work-sort]").click();
+      const sort = document.querySelector("[data-work-sort]");
+      sort.click();
       return Array.from(document.querySelectorAll(".work-card"), (card) => {
         const matrix = new DOMMatrix(getComputedStyle(card).transform);
         return (Math.atan2(matrix.b, matrix.a) * 180) / Math.PI;
@@ -1098,7 +1310,7 @@ try {
     clear.click();
     root.querySelector('[data-work="kuto-measure"]').focus();
     article.click();
-    if (sort.getAttribute("aria-pressed") !== "true") sort.click();
+    while (sort.dataset.workSortOrder !== "oldest") sort.click();
   });
   await page.waitForFunction(
     () => document.querySelectorAll(".work-card.work-swing").length === 2,
@@ -1113,15 +1325,15 @@ try {
     await page
       .locator("[data-work-card]")
       .evaluateAll((nodes) => nodes.map((node) => node.dataset.workCard)),
-    [...expectedWorks].reverse(),
+    oldestWorks,
   );
   assert.equal(
     await page.locator('[data-work-tag="記事"][aria-pressed="true"]').count(),
     2,
   );
   assert.equal(
-    await page.locator("[data-work-sort]").getAttribute("aria-pressed"),
-    "true",
+    await page.locator("[data-work-sort]").getAttribute("data-work-sort-order"),
+    "oldest",
   );
   assert.equal(
     await page
@@ -1159,7 +1371,7 @@ try {
     () => !document.querySelector(".work-swing, .work-swing-start"),
   );
   assert.equal(await activeSways(page), 0);
-  await page.locator("[data-work-sort]").click();
+  await setWorkOrder(page, "newest");
   await page.locator('[data-work-tag="記事"]').first().click();
   await page.locator("[data-clear-work-filter]").click();
   assert.equal(await activeSways(page), 0);
@@ -1191,19 +1403,65 @@ try {
   );
   await page.keyboard.press("Tab");
   const initialSort = page.locator("[data-work-sort]");
-  const initialSortName = await initialSort.getAttribute("aria-label");
+  const initialSortName = await initialSort.evaluate((node) => {
+    const clone = node.cloneNode(true);
+    for (const decoration of clone.querySelectorAll('[aria-hidden="true"]'))
+      decoration.remove();
+    return clone.textContent.replace(/\s+/g, " ").trim();
+  });
+  assert.equal(await initialSort.evaluate((node) => node.tagName), "BUTTON");
+  assert.equal(await initialSort.getAttribute("type"), "button");
+  const orderLabels = JSON.parse(
+    await initialSort.getAttribute("data-work-sort-labels"),
+  );
+  assert.deepEqual(Object.keys(orderLabels), orderModes);
+  assert.equal(await initialSort.getAttribute("aria-pressed"), null);
+  const sortAppearance = await initialSort.evaluate((node) => {
+    const label = node.querySelector("[data-work-sort-label]");
+    const symbol = node.querySelector(".work-sort-symbol");
+    return {
+      underline: getComputedStyle(label).borderBlockEndStyle,
+      underlineWidth: parseFloat(getComputedStyle(label).borderBlockEndWidth),
+      icon: symbol.textContent.trim(),
+      iconHidden: symbol.getAttribute("aria-hidden"),
+      iconPosition: getComputedStyle(symbol).position,
+    };
+  });
+  assert.equal(sortAppearance.underline, "dotted");
+  assert(sortAppearance.underlineWidth >= 1);
+  assert(sortAppearance.icon);
+  assert.equal(sortAppearance.iconHidden, "true");
+  assert.equal(sortAppearance.iconPosition, "static");
   assert(initialSortName?.trim());
   assert(await initialSort.evaluate((node) => node === document.activeElement));
-  assert.equal(await initialSort.getAttribute("aria-pressed"), "false");
+  assert.equal(
+    await initialSort.getAttribute("data-work-sort-order"),
+    "recommended",
+  );
   const initialSortLabel = await initialSort
     .locator("[data-work-sort-label]")
     .textContent();
+  assert.equal(initialSortLabel, orderLabels.recommended);
   assert(initialSortLabel.trim());
   assert.notEqual(
     await initialSort.evaluate((node) => getComputedStyle(node).outlineStyle),
     "none",
   );
   assert((await initialSort.boundingBox()).height >= 44);
+  for (let round = 0; round < 2; round++) {
+    for (const mode of ["newest", "oldest", "recommended"]) {
+      await initialSort.click();
+      await assertWorkOrder(page, mode);
+      assert.deepEqual(await visibleWorkIds(), expectedOrders[mode]);
+      assert(
+        await initialSort.evaluate((node) => node === document.activeElement),
+      );
+    }
+  }
+  assert.equal(
+    await page.getByRole("button", { name: initialSortLabel }).count(),
+    1,
+  );
   for (const id of expectedWorks) {
     await page.keyboard.press("Tab");
     const focus = await page.evaluate(() => ({
@@ -1239,11 +1497,7 @@ try {
   const beforeTagInteractionUrl = page.url();
   await toolTag.focus();
   await page.keyboard.press("Space");
-  assert.deepEqual(await visibleWorkIds(), [
-    "kuto-measure",
-    "image-rect-picker",
-    "kuto-ladder",
-  ]);
+  assert.deepEqual(await visibleWorkIds(), expectedTagMatches.ツール);
   assert.equal(
     await page.locator('[data-work-tag][aria-pressed="true"]').count(),
     3,
@@ -1263,9 +1517,9 @@ try {
     .click();
   assert.deepEqual(await visibleWorkIds(), [
     "kuto-measure",
-    "kuto-nanidasu",
     "kuto-ladder",
     "kuto-glossary",
+    "kuto-nanidasu",
   ]);
   assert.equal(
     await page.locator('[data-work-tag="ツール"][aria-pressed="true"]').count(),
@@ -1287,9 +1541,9 @@ try {
     0,
   );
   assert(!(await page.locator("[data-work-filter-status]").isVisible()));
-  const imageTag = page.locator('[data-work-tag="画像"]');
+  const imageTag = page.locator('[data-work-tag="画像"]').first();
   await imageTag.click();
-  assert.deepEqual(await visibleWorkIds(), ["image-rect-picker"]);
+  assert.deepEqual(await visibleWorkIds(), expectedTagMatches.画像);
   await imageTag.click();
   assert.deepEqual(await visibleWorkIds(), expectedWorks);
   for (const [tag, ids] of Object.entries(expectedTagMatches)) {
@@ -1315,11 +1569,10 @@ try {
     assert(!(await page.locator("[data-work-filter-status]").isVisible()));
   }
   checks.push(
-    "All seven classifications filter six works, toggle, clear and restore focus without navigation",
+    "All nine classifications filter seven works, toggle, clear and restore focus without navigation",
   );
 
   const sortButton = initialSort;
-  const oldestWorks = [...expectedWorks].reverse();
   const domWorkIds = (target) =>
     target
       .locator("[data-work-card]")
@@ -1328,13 +1581,14 @@ try {
   const previousAnnouncement = await page
     .locator("[data-work-announcement]")
     .textContent();
+  await page.keyboard.press("Enter");
+  await assertWorkOrder(page, "newest");
+  assert.deepEqual(await domWorkIds(page), newestWorks);
+  assert(await sortButton.evaluate((node) => node === document.activeElement));
   await page.keyboard.press("Space");
-  assert.equal(await sortButton.getAttribute("aria-pressed"), "true");
-  assert.notEqual(
-    await sortButton.locator("[data-work-sort-label]").textContent(),
-    initialSortLabel,
-  );
-  assert.equal(await sortButton.getAttribute("aria-label"), initialSortName);
+  await assertWorkOrder(page, "oldest");
+  assert(await sortButton.evaluate((node) => node === document.activeElement));
+  assert.equal(await sortButton.getAttribute("data-work-sort-order"), "oldest");
   assert.deepEqual(await domWorkIds(page), oldestWorks);
   assert.deepEqual(await visibleWorkIds(), oldestWorks);
   const announcement = page.locator("[data-work-announcement]");
@@ -1362,13 +1616,21 @@ try {
   }
   await sortButton.focus();
   await page.keyboard.press("Enter");
+  await assertWorkOrder(page, "recommended");
+  assert.equal(
+    await sortButton.getAttribute("data-work-sort-order"),
+    "recommended",
+  );
   assert.deepEqual(await domWorkIds(page), expectedWorks);
-  assert.equal(await sortButton.getAttribute("aria-pressed"), "false");
   assert.equal(
     await sortButton.locator("[data-work-sort-label]").textContent(),
     initialSortLabel,
   );
-  await sortButton.click();
+  await page.keyboard.press("Space");
+  await assertWorkOrder(page, "newest");
+  assert.equal(await sortButton.getAttribute("data-work-sort-order"), "newest");
+  assert.deepEqual(await domWorkIds(page), newestWorks);
+  await setWorkOrder(page, "oldest");
   await loadPreviewImages();
   await page.screenshot({
     path: path.join(qa, "review-works-oldest-desktop.png"),
@@ -1376,7 +1638,7 @@ try {
   });
   await audit("Oldest-first work order");
   checks.push(
-    "Paper sort button exposes a stable accessible name and toggle state; Space/Enter reorder the DOM and keyboard links follow the new visual order",
+    "Sort button cycles recommendations, newest and oldest with repeated clicks, Enter and Space; its underlined label and icon remain accessible and focus follows visual DOM order",
   );
 
   for (const [tag, ids] of Object.entries(expectedTagMatches)) {
@@ -1385,8 +1647,14 @@ try {
       .filter({ hasText: tag })
       .first();
     await button.click();
-    assert.deepEqual(await visibleWorkIds(), [...ids].reverse());
-    assert.equal(await button.getAttribute("aria-pressed"), "true");
+    for (const mode of ["recommended", "newest", "oldest"]) {
+      await setWorkOrder(page, mode);
+      assert.deepEqual(
+        await visibleWorkIds(),
+        expectedOrders[mode].filter((id) => ids.includes(id)),
+      );
+      assert.equal(await button.getAttribute("aria-pressed"), "true");
+    }
     if (tag === "記事") {
       await loadPreviewImages();
       await page.screenshot({
@@ -1394,20 +1662,21 @@ try {
         fullPage: true,
       });
     }
-    await sortButton.click();
-    assert.deepEqual(await visibleWorkIds(), ids);
-    assert.equal(await button.getAttribute("aria-pressed"), "true");
-    await sortButton.click();
-    assert.deepEqual(await visibleWorkIds(), [...ids].reverse());
     await page.locator("[data-clear-work-filter]").click();
     assert.deepEqual(await visibleWorkIds(), oldestWorks);
-    assert.equal(await sortButton.getAttribute("aria-pressed"), "true");
+    assert.equal(
+      await sortButton.getAttribute("data-work-sort-order"),
+      "oldest",
+    );
   }
   await page.reload();
   assert.deepEqual(await visibleWorkIds(), expectedWorks);
-  assert.equal(await sortButton.getAttribute("aria-pressed"), "false");
+  assert.equal(
+    await sortButton.getAttribute("data-work-sort-order"),
+    "recommended",
+  );
   checks.push(
-    "All seven tags retain their selected filter across both sort directions; clearing preserves the chosen order and reloading restores newest first",
+    "All nine tags preserve their filter across all three modes; clear preserves order and reload restores recommendations",
   );
 
   const sortFixture = stableFixture.map((work, index) => ({
@@ -1429,20 +1698,28 @@ try {
           ).publishedAt;
           return [
             id,
-            match[0].replace(
-              / data-work-published-at="[^"]*"/,
-              timestamp === null
-                ? ""
-                : ` data-work-published-at="${timestamp}"`,
-            ),
+            match[0]
+              .replace(
+                / data-work-index="\d+"/,
+                ` data-work-index="${sortFixture.findIndex((work) => work.id === id)}"`,
+              )
+              .replace(
+                / data-work-published-at="[^"]*"/,
+                timestamp === null
+                  ? ""
+                  : ` data-work-published-at="${timestamp}"`,
+              ),
           ];
         },
       ),
     );
-    assert.equal(fragments.size, 6);
-    const ordered = sortWorksByPublishedAt(sortFixture).map((work) =>
-      fragments.get(work.id),
-    );
+    assert.equal(fragments.size, works.length);
+    const ordered = sortRecommendedWorks(
+      sortFixture.map((work) => ({
+        ...work,
+        recommended: expectedRecommended.includes(work.id),
+      })),
+    ).map((work) => fragments.get(work.id));
     let index = 0;
     await route.fulfill({
       response,
@@ -1454,26 +1731,39 @@ try {
   });
   await fixturePage.goto(main);
   const fixtureNewest = [
-    "kuto-nanidasu",
-    "image-rect-picker",
-    "kuto-ladder",
     "blue-archive-damage",
-    "kuto-measure",
+    "kuto-nanidasu",
+    "kuto-ladder",
     "kuto-glossary",
+    "boring-avatars-sharp",
+    "kuto-measure",
+    "image-rect-picker",
   ];
   const fixtureOldest = [
-    "blue-archive-damage",
-    "image-rect-picker",
+    "boring-avatars-sharp",
     "kuto-ladder",
-    "kuto-nanidasu",
-    "kuto-measure",
     "kuto-glossary",
+    "kuto-nanidasu",
+    "blue-archive-damage",
+    "kuto-measure",
+    "image-rect-picker",
   ];
-  assert.deepEqual(await domWorkIds(fixturePage), fixtureNewest);
-  await fixturePage.locator("[data-work-sort]").click();
+  const fixtureRecommended = [
+    "blue-archive-damage",
+    "kuto-ladder",
+    "kuto-glossary",
+    "kuto-measure",
+    "kuto-nanidasu",
+    "boring-avatars-sharp",
+    "image-rect-picker",
+  ];
+  assert.deepEqual(await domWorkIds(fixturePage), fixtureRecommended);
+  await setWorkOrder(fixturePage, "oldest");
   assert.deepEqual(await domWorkIds(fixturePage), fixtureOldest);
-  await fixturePage.locator("[data-work-sort]").click();
+  await setWorkOrder(fixturePage, "newest");
   assert.deepEqual(await domWorkIds(fixturePage), fixtureNewest);
+  await setWorkOrder(fixturePage, "recommended");
+  assert.deepEqual(await domWorkIds(fixturePage), fixtureRecommended);
   await fixturePage.close();
   checks.push(
     "Client sorting compares full timestamps, preserves equal instants across time zones and keeps unknown dates last in stable order for both directions",
@@ -1555,10 +1845,16 @@ try {
     await page.goto(main);
     await noOverflow(`Mobile ${width}`);
     await verifyImageFrames(`mobile ${width}`);
+    await verifyRecommendations(`mobile ${width}`);
+    await loadPreviewImages();
+    await page.screenshot({
+      path: path.join(qa, `review-recommended-mobile-${width}.png`),
+      fullPage: true,
+    });
     const mobileSort = page.locator("[data-work-sort]");
     assert((await mobileSort.boundingBox()).height >= 44);
-    await mobileSort.click();
-    assert.deepEqual(await visibleWorkIds(), [...expectedWorks].reverse());
+    await setWorkOrder(page, "oldest");
+    assert.deepEqual(await visibleWorkIds(), oldestWorks);
     await noOverflow(`Oldest mobile ${width}`);
     await loadPreviewImages();
     await page.screenshot({
@@ -1577,12 +1873,14 @@ try {
         fullPage: true,
       });
     }
-    await mobileSort.click();
+    await setWorkOrder(page, "newest");
     assert.deepEqual(await visibleWorkIds(), [
       "blue-archive-damage",
       "kuto-glossary",
     ]);
     await page.locator("[data-clear-work-filter]").click();
+    assert.deepEqual(await visibleWorkIds(), newestWorks);
+    await setWorkOrder(page, "recommended");
     assert.deepEqual(await visibleWorkIds(), expectedWorks);
     const cards = await page.locator("[data-work-item]").all();
     const positions = await Promise.all(
@@ -2005,8 +2303,8 @@ try {
     "dark",
   );
   assert.deepEqual(await visibleWorkIds(touchPage), expectedWorks);
-  await touchPage.locator('[data-work-tag="画像"]').tap();
-  assert.deepEqual(await visibleWorkIds(touchPage), ["image-rect-picker"]);
+  await touchPage.locator('[data-work-tag="画像"]').first().tap();
+  assert.deepEqual(await visibleWorkIds(touchPage), expectedTagMatches.画像);
   await touchPage.locator("[data-clear-work-filter]").tap();
   assert.deepEqual(await visibleWorkIds(touchPage), expectedWorks);
   for (const [tag, ids] of Object.entries(expectedTagMatches)) {
@@ -2019,34 +2317,33 @@ try {
     await touchPage.locator("[data-clear-work-filter]").tap();
     assert.deepEqual(await visibleWorkIds(touchPage), expectedWorks);
   }
-  checks.push("All seven work tags and clear work on a touch device");
+  checks.push("All nine work tags and clear work on a touch device");
   const touchSort = touchPage.locator("[data-work-sort]");
-  await touchSort.tap();
-  assert.deepEqual(
-    await visibleWorkIds(touchPage),
-    [...expectedWorks].reverse(),
-  );
-  assert.equal(await touchSort.getAttribute("aria-pressed"), "true");
+  assert((await touchSort.boundingBox()).height >= 44);
+  for (const mode of ["newest", "oldest", "recommended"]) {
+    await touchSort.tap();
+    await assertWorkOrder(touchPage, mode);
+    assert.deepEqual(await visibleWorkIds(touchPage), expectedOrders[mode]);
+  }
+  await setWorkOrder(touchPage, "oldest", "tap");
+  assert.deepEqual(await visibleWorkIds(touchPage), oldestWorks);
   await touchPage.locator('[data-work-tag="記事"]').first().tap();
   assert.deepEqual(await visibleWorkIds(touchPage), [
     "kuto-glossary",
     "blue-archive-damage",
   ]);
-  await touchSort.tap();
+  await setWorkOrder(touchPage, "newest", "tap");
   assert.deepEqual(await visibleWorkIds(touchPage), [
     "blue-archive-damage",
     "kuto-glossary",
   ]);
-  await touchSort.tap();
+  await setWorkOrder(touchPage, "oldest", "tap");
   await touchPage.locator("[data-clear-work-filter]").tap();
-  assert.deepEqual(
-    await visibleWorkIds(touchPage),
-    [...expectedWorks].reverse(),
-  );
-  await touchSort.tap();
+  assert.deepEqual(await visibleWorkIds(touchPage), oldestWorks);
+  await setWorkOrder(touchPage, "recommended", "tap");
   assert.deepEqual(await visibleWorkIds(touchPage), expectedWorks);
   checks.push(
-    "Mobile taps toggle both directions, preserve the article filter and keep oldest order when the filter is cleared",
+    "Mobile sort button cycles once per tap, supports all modes, preserves tag selection and retains order after clear",
   );
   await assertFixedLight(
     touchPage,
@@ -2068,12 +2365,12 @@ try {
   await assertFixedLight(touchPage, "Tag taps keep the light palette");
   await touchPage.goto(main);
   await touchPage.emulateMedia({ reducedMotion: "no-preference" });
-  await touchPage.locator("[data-work-sort]").tap();
+  await setWorkOrder(touchPage, "newest", "tap");
   await observeCardSway(touchPage, "Touch paper sway 390px");
   await touchPage.emulateMedia({ reducedMotion: "reduce" });
   assert.equal(await activeSways(touchPage), 0);
   checks.push(
-    "A mobile tap triggers damped paper sway around a stationary pin and respects a changed motion preference",
+    "Mobile order selection triggers damped paper sway around a stationary pin and respects a changed motion preference",
   );
   await writeFile(
     path.join(qa, "work-motion-results.json"),
@@ -2082,7 +2379,7 @@ try {
   await touchPage.goto(`${contentSite}articles/`);
   await touchPage.locator(".brand").tap();
   await touchPage.waitForURL(contentSite);
-  assert.equal(await touchPage.locator("a[data-work]").count(), 6);
+  assert.equal(await touchPage.locator("a[data-work]").count(), works.length);
   await touchContext.close();
   checks.push(
     "Touch navigation stays light on dark OS with a saved dark choice",
@@ -2117,14 +2414,17 @@ try {
     ),
     "#ead8bd",
   );
-  assert.equal(await noJsPage.locator("a[data-work]").count(), 6);
+  assert.equal(await noJsPage.locator("a[data-work]").count(), works.length);
   assert.deepEqual(await visibleWorkIds(noJsPage), expectedWorks);
   assert(!(await noJsPage.locator("[data-work-controls]").isVisible()));
   assert.equal(
     await noJsPage.locator("[data-work-sort]").getAttribute("disabled"),
     "",
   );
-  assert.equal(await noJsPage.locator("[data-work-tag]:disabled").count(), 17);
+  assert.equal(
+    await noJsPage.locator("[data-work-tag]:disabled").count(),
+    works.reduce((sum, work) => sum + work.tags.length, 0),
+  );
   assert(!(await noJsPage.locator("[data-work-filter-status]").isVisible()));
   await noJsPage.goto(`${main}articles/`);
   await noJsPage.locator("[data-empty-articles]").waitFor({ state: "visible" });

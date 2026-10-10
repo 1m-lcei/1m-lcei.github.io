@@ -5,8 +5,9 @@ import Arrow from "./Arrow.astro";
 
 interface Props {
   work: Work;
+  order: number;
 }
-const { work } = Astro.props;
+const { work, order } = Astro.props;
 const { preview } = work;
 const publicationDateParts = work.tags.includes("記事") && work.publishedAt !== null
   ? Object.fromEntries(new Intl.DateTimeFormat("ja-JP", {
@@ -27,15 +28,23 @@ const previewStyle = [
   `--preview-top: ${(-preview.crop.y / preview.crop.height) * 100}%`,
 ].join(";");
 ---
-<li class:list={["work-item", `tone-${work.tone}`]} data-work-item data-work-tags={JSON.stringify(work.tags)} data-work-published-at={work.publishedAt}>
+<li class:list={["work-item", `tone-${work.tone}`]} data-work-item data-work-index={order} data-work-recommended={work.recommended ? "true" : undefined} data-work-tags={JSON.stringify(work.tags)} data-work-published-at={work.publishedAt}>
   <span class="pin work-pin" aria-hidden="true"></span>
   <article class:list={["work-card", "paper", `tone-${work.tone}`]} data-work-card={work.id}>
     <div class="work-heading">
       <span class="work-icon">{work.icon.includes("#")
         ? <svg width="40" height="40" aria-hidden="true"><use href={localHref(work.icon)} /></svg>
         : <img src={localHref(work.icon)} width="48" height="48" alt="" />}</span>
+      <div class="work-title">
       <h2 id={`title-${work.id}`}><a class="work-link" href={work.href}
-        aria-labelledby={`title-${work.id}`} aria-describedby={[`description-${work.id}`, work.note && `note-${work.id}`].filter(Boolean).join(" ")} data-work={work.id}>{work.name}</a></h2>
+        aria-labelledby={`title-${work.id}`} aria-describedby={[`description-${work.id}`, work.note && `note-${work.id}`, work.recommended && `recommendation-${work.id}`].filter(Boolean).join(" ")} data-work={work.id}>{work.name}</a></h2>
+      {work.recommended && <span class="work-recommendation" id={`recommendation-${work.id}`}>
+        <svg width="44" height="44" viewBox="0 0 44 44" aria-hidden="true" focusable="false">
+          <use href={localHref("hanamaru.svg#hanamaru")} />
+        </svg>
+        <span class="visually-hidden">オススメ</span>
+      </span>}
+      </div>
     </div>
     <div class="work-tags" role="group" aria-label={`${work.name} の分類タグ`}>
       {work.tags.map((tag) => <button type="button" class="work-tag" data-work-tag={tag}

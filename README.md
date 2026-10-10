@@ -23,14 +23,15 @@ bun run social-image # 構図を変更したときにOGPを再生成
 
 | 場所 | 用途 |
 | --- | --- |
-| `src/data/works.ts` | 名前・説明・任意の注記 `note`・リンク・タグ・公開日時と出典・画像範囲 |
+| `src/data/works.ts` | 名前・説明・任意の注記 `note`・オススメ指定 `recommended`・リンク・タグ・公開日時と出典・画像範囲 |
 | `src/styles/global.css` / `src/layouts/SiteLayout.astro` | 見た目・共通表示・メタデータ |
 | `src/lib/site.ts` / `astro.config.mjs` | サイト名・説明・公開先・base |
 | `src/content/posts/` / `templates/article.md` | Markdown記事とひな形 |
 | `public/tools/` / `public/articles/` / `src/assets/textures/` | アイコン・PNG/AVIF・紙とコルク（出典は `assets/`） |
+| `public/hanamaru.svg` | 花丸の共通symbol（カードから `use` で参照） |
 | `assets/social-preview/board.html` / `public/og/works-board.png` | OGP構図と1200×630の共有画像 |
 
-作品は公開日時の新しい順を初期表示し、古い順への切替と単一タグ絞込を併用できる。同時刻は定義順、不明日時は末尾。注記は説明文の下に表示する。[公開日時の出典](assets/publication-sources.md)を参照。
+作品はオススメ指定したものを先頭に、各群で公開日時の新しい順を初期表示する。ソートボタンを押すたびにおすすめ順→新しい順→古い順→おすすめ順と切り替え、単一タグ絞込と併用できる。同時刻は定義順、不明日時は末尾。注記は説明文の下に表示する。[公開日時の出典](assets/publication-sources.md)を参照。
 
 記事は `title`・`description`・`date` が必須、`tags` は任意。公開するものだけ `draft: false` にし、`/articles/` に掲載する。下書きと仮記事は本番に含めない。
 
