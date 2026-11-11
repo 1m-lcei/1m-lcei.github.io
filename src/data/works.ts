@@ -75,7 +75,7 @@ export const works: Work[] = [
       precision: "second",
       basis: "pages-success",
     },
-    name: "Kuto Measure (仮)",
+    name: "（主に）対抗戦のマップけーそくツール",
     description: "戦術対抗戦の対戦中画像を下敷きに、距離を図ります。",
     note: "（確認シーズン：S11）",
     tags: ["ツール", "ブルーアーカイブ", "戦術対抗戦"],
