@@ -55,6 +55,7 @@ try {
   await page
     .locator("img")
     .evaluateAll((nodes) => Promise.all(nodes.map((node) => node.decode())));
+  // biome-ignore lint/performance/useDomNodeTextContent: Check only the text rendered in the screenshot.
   assert.equal(await page.locator("body").innerText(), "");
   assert.equal(await page.locator(".shot").count(), 3);
   const directory = path.join(root, "public/og");
