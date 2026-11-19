@@ -1032,7 +1032,6 @@ try {
     "All seven pictures select AVIF, reserve dimensions, retain exact PNG/AVIF bytes and avoid source-pixel enlargement",
   );
   await noOverflow("Desktop");
-  await audit("Desktop homepage");
   await page.screenshot({
     path: path.join(qa, "home-desktop.png"),
     fullPage: true,
@@ -1388,6 +1387,8 @@ try {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto(main);
   await loadPreviewImages();
+  // Firefox 159 can crash if axe scans the document used for the card checks.
+  await audit("Desktop homepage");
 
   await page.keyboard.press("Tab");
   assert(
